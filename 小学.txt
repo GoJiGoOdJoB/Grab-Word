@@ -1,0 +1,141 @@
+amily	家庭	boy	男孩
+father (dad)	爸爸	girl	女孩
+mother (mom)	妈妈	man	男人
+grandfather (grandpa)	爷爷/外公	woman	女人
+grandmother (grandma)	奶奶/外婆	friend	朋友
+brother	兄弟	teacher	老师
+sister	姐妹	student	学生
+uncle	叔叔/舅舅	baby	婴儿
+aunt	阿姨/姑姑	kid	小孩
+cousin	表/堂兄弟姐妹	child (children)	孩子
+body	身体	mouth	嘴巴
+head	头	tooth (teeth)	牙齿
+hair	头发	arm	手臂
+face	脸	hand	手
+eye	眼睛	finger	手指
+ear	耳朵	leg	腿
+nose	鼻子	foot (feet)	脚
+color	颜色	white	白色(的)
+red	红色(的)	black	黑色(的)
+blue	蓝色(的)	pink	粉色(的)
+yellow	黄色(的)	purple	紫色(的)
+green	绿色(的)	brown	棕色(的)
+orange	橙色(的)	grey (gray)	灰色(的)
+animal	动物	bird	鸟
+dog	狗	tiger	老虎
+cat	猫	lion	狮子
+pig	猪	elephant	大象
+cow	奶牛	monkey	猴子
+sheep	绵羊	panda	熊猫
+duck	鸭子	bear	熊
+chicken	鸡	rabbit	兔子
+horse	马	fish	鱼
+food	食物	egg	鸡蛋
+rice	米饭	meat	肉
+noodle	面条	water	水
+bread	面包	milk	牛奶
+cake	蛋糕	juice	果汁
+hamburger	汉堡包	tea	茶
+hot dog	热狗	coffee	咖啡
+ice cream	冰淇淋	soup	汤
+fruit	水果	pear	梨
+apple	苹果	watermelon	西瓜
+banana	香蕉	peach	桃子
+orange	橙子/橘子	vegetable	蔬菜
+grape	葡萄	tomato	西红柿
+strawberry	草莓	potato	土豆
+school	学校	book	书
+classroom	教室	bag	书包
+desk	书桌	paper	纸
+chair	椅子	word	单词
+pen	钢笔	class	班级/课程
+pencil	铅笔	English	英语
+ruler	尺子	math	数学
+eraser	橡皮	music	音乐
+clothes	衣服	shoe	鞋子
+shirt	衬衫	sock	袜子
+T-shirt	T恤衫	hat	帽子
+skirt	短裙	cap	鸭舌帽
+dress	连衣裙	coat	外套
+pants	长裤	jacket	夹克衫
+shorts	短裤	sweater	毛衣
+home	家	bed	床
+house	房子	table	桌子
+room	房间	sofa	沙发
+bedroom	卧室	phone	电话/手机
+bathroom	浴室	TV	电视
+kitchen	厨房	computer	电脑
+door	门	picture	照片/画
+window	窗户	toy	玩具
+sun	太阳	grass	草
+moon	月亮	rain	雨/下雨
+star	星星	snow	雪/下雪
+sky	天空	wind	风
+cloud	云	cloud	云
+tree	树	hot	热的
+flower	花	cold	冷的
+go	去	eat	吃
+come	来	drink	喝
+walk	走	sleep	睡觉
+run	跑	look	看(动作)
+jump	跳	see	看见(结果)
+swim	游泳	watch	观看(电视/比赛)
+fly	飞	listen	听(动作)
+play	玩/打(球)	hear	听见(结果)
+do	做/干	speak	说(语言)
+make	制作	talk	交谈/讨论
+read	读/阅读	help	帮助
+write	写	buy	买
+sing	唱	sell	卖
+dance	跳舞	open	打开
+draw	画	close	关闭
+am/is/are	是	give	给
+have/has	有	get	得到/到达
+like	喜欢	take	拿走/花费
+love	爱	bring	带来
+want	想要	sit	坐
+need	需要	stand	站
+think	思考/认为	start/begin	开始
+know	知道/认识	stop	停止
+big	大的	small	小的
+long	长的	short	短的/矮的
+tall	高的	fat	胖的
+thin	瘦的	heavy	重的
+good	好的	bad	坏的/差的
+new	新的	old	旧的/老的
+young	年轻的	happy	快乐的
+sad	伤心的	angry	生气的
+fast	快的	slow	慢的
+beautiful	美丽的	ugly	丑陋的
+right	对的/右边的	wrong	错的
+easy	简单的	hard/difficult	困难的
+clean	干净的	dirty	脏的
+car	小汽车	ship	轮船
+bus	公交车	boat	小船
+bike / bicycle	自行车	plane / airplane	飞机
+train	火车	taxi	出租车
+subway	地铁	truck	卡车
+time	时间	morning	早上/上午
+year	年	afternoon	下午
+month	月	evening	傍晚/晚上
+week	周/星期	night	夜晚
+day	天/日	today	今天
+hour	小时	tomorrow	明天
+minute	分钟	yesterday	昨天
+spring	春天	autumn / fall	秋天
+summer	夏天	winter	冬天
+doctor	医生	cook / chef	厨师
+nurse	护士	worker	工人
+driver	司机	singer	歌手
+farmer	农民	dancer	舞者
+policeman	警察	postman	邮递员
+park	公园	shop / store	商店
+zoo	动物园	cinema	电影院
+library	图书馆	supermarket	超市
+hospital	医院	farm	农场
+bank	银行	city	城市
+sport	运动	football/soccer	足球
+hobby	爱好	basketball	篮球
+game	游戏/比赛	ping-pong	乒乓球
+art	美术/艺术	chess	国际象棋
+music	音乐	kite	风筝
