@@ -979,25 +979,20 @@ body.uppercase-mode .card { text-transform: uppercase; }
             <input type="radio" name="libSource" id="chkPrivateLib" onchange="onLibToggle()">
           </label>
           <div class="settings-lib-group" id="privateLibGroup">
-            <div class="settings-lib-label">手牌</div>
-            <div class="settings-lib-btns">
-              <button class="settings-lib-btn" disabled>导入</button>
-              <button class="settings-lib-btn" disabled>导出</button>
-            </div>
             <div class="settings-lib-label">小学级</div>
             <div class="settings-lib-btns">
-              <button class="settings-lib-btn" disabled>导入</button>
-              <button class="settings-lib-btn" disabled>导出</button>
+              <button class="settings-lib-btn" disabled onclick="importLib('easy')">导入</button>
+              <button class="settings-lib-btn" disabled onclick="exportLib('easy')">导出</button>
             </div>
             <div class="settings-lib-label">初中级</div>
             <div class="settings-lib-btns">
-              <button class="settings-lib-btn" disabled>导入</button>
-              <button class="settings-lib-btn" disabled>导出</button>
+              <button class="settings-lib-btn" disabled onclick="importLib('medium')">导入</button>
+              <button class="settings-lib-btn" disabled onclick="exportLib('medium')">导出</button>
             </div>
             <div class="settings-lib-label">高中级</div>
             <div class="settings-lib-btns">
-              <button class="settings-lib-btn" disabled>导入</button>
-              <button class="settings-lib-btn" disabled>导出</button>
+              <button class="settings-lib-btn" disabled onclick="importLib('hard')">导入</button>
+              <button class="settings-lib-btn" disabled onclick="exportLib('hard')">导出</button>
             </div>
           </div>
         </div>
@@ -1132,7 +1127,7 @@ function selectDiff(d){
   document.getElementById('controlsHint').innerHTML=hints[d];
 }
 
-function pickWord(){if(G.wordQueue.length===0)G.wordQueue=shuffle(WORDS_MAP[selectedDiff]);return G.wordQueue.pop();}
+function pickWord(){if(G.wordQueue.length===0)G.wordQueue=shuffle(getEffectiveWords()[selectedDiff]);return G.wordQueue.pop();}
 
 function rollShinyPRD(){
   G.prdCounter++;
@@ -1180,7 +1175,7 @@ function setupWord(winnerHand){
 }
 
 function pickWordForHand(handLetters,blankCount){
-  if(G.wordQueue.length===0)G.wordQueue=shuffle(WORDS_MAP[selectedDiff]);
+  if(G.wordQueue.length===0)G.wordQueue=shuffle(getEffectiveWords()[selectedDiff]);
 
   // try to find word with enough matchable letters
   for(let i=0;i<G.wordQueue.length;i++){
@@ -1204,7 +1199,7 @@ function pickWordForHand(handLetters,blankCount){
   }
 
   // fallback: pick any word, inject needed letters into hands
-  if(G.wordQueue.length===0)G.wordQueue=shuffle(WORDS_MAP[selectedDiff]);
+  if(G.wordQueue.length===0)G.wordQueue=shuffle(getEffectiveWords()[selectedDiff]);
   const wordObj=G.wordQueue.pop();
   const letters=wordObj.en.split('');
   const positions=[...Array(letters.length).keys()];
@@ -1529,7 +1524,7 @@ function beginGame(){
   document.getElementById('splitLeft').classList.remove('game-hidden');
   document.getElementById('splitRight').classList.remove('game-hidden');
   document.getElementById('pvpCenter').classList.remove('game-hidden');
-  G.running=true;G.wordQueue=shuffle(WORDS_MAP[selectedDiff]);setupWord();
+  G.running=true;G.wordQueue=shuffle(getEffectiveWords()[selectedDiff]);setupWord();
   G.timerInterval=setInterval(()=>{
     G.timeLeft--;
     document.querySelectorAll('.timer-sync').forEach(el=>el.textContent=G.timeLeft);
@@ -1754,7 +1749,100 @@ function onLibToggle(){
   const priv=document.getElementById('chkPrivateLib').checked;
   document.querySelectorAll('#privateLibGroup .settings-lib-btn').forEach(b=>b.disabled=!priv);
 }
-function saveSettings(){closeSettings();}
+
+// ===== localStorage =====
+const STORAGE_KEY='grabword_save';
+function loadSave(){
+  try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch(e){return {};}
+}
+function writeSave(data){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+}
+function saveSettings(){
+  const save=loadSave();
+  save.usePrivate=document.getElementById('chkPrivateLib').checked;
+  writeSave(save);
+  closeSettings();
+}
+function initSettingsFromSave(){
+  const save=loadSave();
+  if(save.usePrivate){
+    document.getElementById('chkPrivateLib').checked=true;
+    document.getElementById('chkOfficialLib').checked=false;
+    onLibToggle();
+  }
+}
+
+// ===== Private lib: get effective word map =====
+function getEffectiveWords(){
+  const save=loadSave();
+  if(!save.usePrivate)return WORDS_MAP;
+  const priv=save.privateLib||{};
+  return {
+    easy: (priv.easy&&priv.easy.length>0)? priv.easy : WORDS_MAP.easy,
+    medium: (priv.medium&&priv.medium.length>0)? priv.medium : WORDS_MAP.medium,
+    hard: (priv.hard&&priv.hard.length>0)? priv.hard : WORDS_MAP.hard
+  };
+}
+
+// ===== Export =====
+function exportLib(level){
+  const save=loadSave();
+  const priv=save.privateLib||{};
+  let words=priv[level];
+  if(!words||words.length===0) words=WORDS_MAP[level]||[];
+  if(words.length===0){alert('该级别无内容可导出');return;}
+  const txt=words.map(w=>w.en+','+w.cn).join(',\n');
+  const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const names={easy:'小学级',medium:'初中级',hard:'高中级'};
+  a.download=`词库_${names[level]||level}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ===== Import =====
+function importLib(level){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.txt';
+  input.onchange=()=>{
+    const file=input.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const text=reader.result;
+      const words=parseImportText(text);
+      if(words.length===0){alert('未能解析到有效单词，请检查格式');return;}
+      const save=loadSave();
+      if(!save.privateLib)save.privateLib={};
+      save.privateLib[level]=words;
+      writeSave(save);
+      alert(`成功导入 ${words.length} 个单词到${({easy:'小学级',medium:'初中级',hard:'高中级'})[level]}`);
+    };
+    reader.readAsText(file,'utf-8');
+  };
+  input.click();
+}
+function parseImportText(text){
+  const words=[];
+  // flatten all text, split only by comma
+  const raw=text.replace(/\r?\n/g,',');
+  const parts=raw.split(',').map(s=>s.trim()).filter(Boolean);
+  // pairs: [en, cn, en, cn, ...]
+  for(let i=0;i<parts.length-1;i+=2){
+    const en=parts[i];
+    const cn=parts[i+1];
+    if(/^[a-zA-Z]+$/.test(en)){
+      words.push({en:en.toLowerCase(),cn:cn});
+    }
+  }
+  return words;
+}
+
+// init on page load
+document.addEventListener('DOMContentLoaded',initSettingsFromSave);
 
 // ============ SOLO TOWER MODE ============
 const SOLO_STAGES=[
@@ -1832,7 +1920,7 @@ function beginSoloGame(){
   S.endlessLevel=0;
   S.lives=2;
   S.timeFractional=false;
-  S.wordQueue=shuffle(WORDS_MAP[soloStage().bank]);
+  S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   soloUpdateStageUI();
   document.getElementById('soloTimer').textContent=soloFormatTime();
@@ -1951,7 +2039,7 @@ function soloRollShiny(){
 
 function soloPickWord(bankOverride){
   const bank=bankOverride||soloStage().bank;
-  if(S.wordQueue.length===0||bankOverride)S.wordQueue=shuffle(WORDS_MAP[bank]);
+  if(S.wordQueue.length===0||bankOverride)S.wordQueue=shuffle(getEffectiveWords()[bank]);
   return S.wordQueue.pop();
 }
 
@@ -2332,7 +2420,7 @@ function soloPromote(){
   }
   if(timeBonus>0){S.timeLeft+=timeBonus;soloShowTimeBonus(`+${timeBonus} (升段)`);}
 
-  S.wordQueue=shuffle(WORDS_MAP[soloStage().bank]);
+  S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   // flash effect
   const flash=document.createElement('div');
@@ -2394,7 +2482,7 @@ function soloDemote(){
   S.stageIdx=Math.max(0,S.stageIdx-1);
   S.stageScore=0;S.correctCount=0;S.streakCount=0;S.promoReady=false;S.isPromoQuestion=false;
   S.lives--;
-  S.wordQueue=shuffle(WORDS_MAP[soloStage().bank]);
+  S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   const flash=document.createElement('div');
   flash.className='solo-demote-flash';
@@ -2588,7 +2676,7 @@ document.addEventListener('keydown',(e)=>{
 });
 
 // debug commands
-window.tower_max=function(){if(selectedMode!=='solo')return 'Not in solo mode';S.stageIdx=9;S.maxStageReached=9;S.wordQueue=shuffle(WORDS_MAP[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return 'Jumped to 无尽级';};
+window.tower_max=function(){if(selectedMode!=='solo')return 'Not in solo mode';S.stageIdx=9;S.maxStageReached=9;S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return 'Jumped to 无尽级';};
 window.set_point=function(n){if(selectedMode!=='solo')return 'Not in solo mode';S.totalScore=n;soloUpdateStageUI();return 'Score set to '+n;};
 window.game_over=function(){if(selectedMode!=='solo')return 'Not in solo mode';soloEndGame();return 'Game ended';};
 
