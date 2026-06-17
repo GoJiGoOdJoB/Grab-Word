@@ -530,29 +530,122 @@ body {
 .settings-modal {
   background: #fff;
   border-radius: 16px;
-  padding: 30px;
-  width: min(400px, 88vw);
-  max-height: 80vh;
-  overflow-y: auto;
+  width: min(480px, 90vw);
+  height: min(520px, 80vh);
   box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid #3a7bd5;
 }
-.settings-title {
-  font-size: 22px;
-  font-weight: bold;
-  margin-bottom: 20px;
+.settings-header {
+  background: #fff;
+  border-bottom: 2px solid #3a7bd5;
+  padding: 14px 20px;
   text-align: center;
+  font-size: 22px;
+  font-weight: 900;
+  flex-shrink: 0;
 }
-.settings-close {
-  display: block;
-  margin: 20px auto 0;
-  padding: 10px 30px;
+.settings-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.settings-sidebar {
+  width: 90px;
+  background: #3a7bd5;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+.settings-tab {
+  padding: 14px 12px;
+  color: rgba(255,255,255,0.7);
   font-size: 16px;
-  border: none;
-  border-radius: 20px;
-  background: linear-gradient(145deg, #2178d2, #1565c0);
-  color: #fff;
   font-weight: bold;
   cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.settings-tab.active {
+  background: #fff;
+  color: #333;
+  border-radius: 0 10px 10px 0;
+  margin-right: -1px;
+}
+.settings-save {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  padding: 10px 0;
+  background: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s;
+}
+.settings-save:hover { background: #f0f0f0; }
+.settings-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+.settings-page { display: none; }
+.settings-page.active { display: block; }
+.settings-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.settings-radio-row input[type="radio"] {
+  width: 22px;
+  height: 22px;
+  accent-color: #3a7bd5;
+  cursor: pointer;
+}
+.settings-lib-group {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+.settings-lib-label {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #333;
+}
+.settings-lib-btns {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.settings-lib-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #3a7bd5;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.settings-lib-btn:hover { background: #2a5fa8; }
+.settings-lib-btn:disabled {
+  background: #ccc;
+  color: #888;
+  cursor: not-allowed;
 }
 .case-A { font-size: 22px; font-weight: bold; color: rgba(0,0,0,0.2); transition: color 0.2s; }
 .case-a { font-size: 18px; font-weight: bold; color: #333; transition: color 0.2s; margin-left: 1px; }
@@ -868,9 +961,50 @@ body.uppercase-mode .card { text-transform: uppercase; }
 <!-- Rules Modal -->
 <div class="settings-overlay hidden" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
   <div class="settings-modal">
-    <div class="settings-title">设置</div>
-    <div id="settingsContent"></div>
-    <button class="settings-close" onclick="closeSettings()">关闭</button>
+    <div class="settings-header">设置</div>
+    <div class="settings-body">
+      <div class="settings-sidebar">
+        <div class="settings-tab active" data-tab="wordlib" onclick="switchSettingsTab('wordlib')">词库</div>
+        <div class="settings-tab" data-tab="cache" onclick="switchSettingsTab('cache')">缓存</div>
+        <button class="settings-save" onclick="saveSettings()">保存</button>
+      </div>
+      <div class="settings-content">
+        <div class="settings-page active" id="settingsPageWordlib">
+          <label class="settings-radio-row">
+            <span>使用官方库</span>
+            <input type="radio" name="libSource" id="chkOfficialLib" checked onchange="onLibToggle()">
+          </label>
+          <label class="settings-radio-row">
+            <span>使用私有库</span>
+            <input type="radio" name="libSource" id="chkPrivateLib" onchange="onLibToggle()">
+          </label>
+          <div class="settings-lib-group" id="privateLibGroup">
+            <div class="settings-lib-label">手牌</div>
+            <div class="settings-lib-btns">
+              <button class="settings-lib-btn" disabled>导入</button>
+              <button class="settings-lib-btn" disabled>导出</button>
+            </div>
+            <div class="settings-lib-label">小学级</div>
+            <div class="settings-lib-btns">
+              <button class="settings-lib-btn" disabled>导入</button>
+              <button class="settings-lib-btn" disabled>导出</button>
+            </div>
+            <div class="settings-lib-label">初中级</div>
+            <div class="settings-lib-btns">
+              <button class="settings-lib-btn" disabled>导入</button>
+              <button class="settings-lib-btn" disabled>导出</button>
+            </div>
+            <div class="settings-lib-label">高中级</div>
+            <div class="settings-lib-btns">
+              <button class="settings-lib-btn" disabled>导入</button>
+              <button class="settings-lib-btn" disabled>导出</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-page" id="settingsPageCache">
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="overlay hidden" id="rulesOverlay">
@@ -917,10 +1051,14 @@ body.uppercase-mode .card { text-transform: uppercase; }
 
 <script>
 // Banks
-const WORDS_EASY=[{en:"family",cn:"家庭"},{en:"boy",cn:"男孩"},{en:"girl",cn:"女孩"},{en:"man",cn:"男人"},{en:"woman",cn:"女人"},{en:"friend",cn:"朋友"},{en:"brother",cn:"兄弟"},{en:"teacher",cn:"老师"},{en:"sister",cn:"姐妹"},{en:"student",cn:"学生"},{en:"uncle",cn:"叔叔/舅舅"},{en:"baby",cn:"婴儿"},{en:"aunt",cn:"阿姨/姑姑"},{en:"kid",cn:"小孩"},{en:"cousin",cn:"表/堂兄弟姐妹"},{en:"body",cn:"身体"},{en:"mouth",cn:"嘴巴"},{en:"head",cn:"头"},{en:"hair",cn:"头发"},{en:"arm",cn:"手臂"},{en:"face",cn:"脸"},{en:"hand",cn:"手"},{en:"eye",cn:"眼睛"},{en:"finger",cn:"手指"},{en:"ear",cn:"耳朵"},{en:"leg",cn:"腿"},{en:"nose",cn:"鼻子"},{en:"color",cn:"颜色"},{en:"white",cn:"白色(的)"},{en:"red",cn:"红色(的)"},{en:"black",cn:"黑色(的)"},{en:"blue",cn:"蓝色(的)"},{en:"pink",cn:"粉色(的)"},{en:"yellow",cn:"黄色(的)"},{en:"purple",cn:"紫色(的)"},{en:"green",cn:"绿色(的)"},{en:"brown",cn:"棕色(的)"},{en:"orange",cn:"橙色(的)"},{en:"animal",cn:"动物"},{en:"bird",cn:"鸟"},{en:"dog",cn:"狗"},{en:"tiger",cn:"老虎"},{en:"cat",cn:"猫"},{en:"lion",cn:"狮子"},{en:"pig",cn:"猪"},{en:"elephant",cn:"大象"},{en:"cow",cn:"奶牛"},{en:"monkey",cn:"猴子"},{en:"sheep",cn:"绵羊"},{en:"panda",cn:"熊猫"},{en:"duck",cn:"鸭子"},{en:"bear",cn:"熊"},{en:"chicken",cn:"鸡"},{en:"rabbit",cn:"兔子"},{en:"horse",cn:"马"},{en:"fish",cn:"鱼"},{en:"food",cn:"食物"},{en:"egg",cn:"鸡蛋"},{en:"rice",cn:"米饭"},{en:"meat",cn:"肉"},{en:"noodle",cn:"面条"},{en:"water",cn:"水"},{en:"bread",cn:"面包"},{en:"milk",cn:"牛奶"},{en:"cake",cn:"蛋糕"},{en:"juice",cn:"果汁"},{en:"tea",cn:"茶"},{en:"coffee",cn:"咖啡"},{en:"soup",cn:"汤"},{en:"fruit",cn:"水果"},{en:"pear",cn:"梨"},{en:"apple",cn:"苹果"},{en:"banana",cn:"香蕉"},{en:"peach",cn:"桃子"},{en:"orange",cn:"橙子/橘子"},{en:"grape",cn:"葡萄"},{en:"tomato",cn:"西红柿"},{en:"potato",cn:"土豆"},{en:"school",cn:"学校"},{en:"book",cn:"书"},{en:"bag",cn:"书包"},{en:"desk",cn:"书桌"},{en:"paper",cn:"纸"},{en:"chair",cn:"椅子"},{en:"word",cn:"单词"},{en:"pen",cn:"钢笔"},{en:"class",cn:"班级/课程"},{en:"pencil",cn:"铅笔"},{en:"english",cn:"英语"},{en:"ruler",cn:"尺子"},{en:"math",cn:"数学"},{en:"eraser",cn:"橡皮"},{en:"music",cn:"音乐"},{en:"clothes",cn:"衣服"},{en:"shoe",cn:"鞋子"},{en:"shirt",cn:"衬衫"},{en:"sock",cn:"袜子"},{en:"hat",cn:"帽子"},{en:"skirt",cn:"短裙"},{en:"cap",cn:"鸭舌帽"},{en:"dress",cn:"连衣裙"},{en:"coat",cn:"外套"},{en:"pants",cn:"长裤"},{en:"jacket",cn:"夹克衫"},{en:"shorts",cn:"短裤"},{en:"sweater",cn:"毛衣"},{en:"home",cn:"家"},{en:"bed",cn:"床"},{en:"house",cn:"房子"},{en:"table",cn:"桌子"},{en:"room",cn:"房间"},{en:"sofa",cn:"沙发"},{en:"bedroom",cn:"卧室"},{en:"phone",cn:"电话/手机"},{en:"bathroom",cn:"浴室"},{en:"kitchen",cn:"厨房"},{en:"computer",cn:"电脑"},{en:"door",cn:"门"},{en:"picture",cn:"照片/画"},{en:"window",cn:"窗户"},{en:"toy",cn:"玩具"},{en:"sun",cn:"太阳"},{en:"grass",cn:"草"},{en:"moon",cn:"月亮"},{en:"rain",cn:"雨/下雨"},{en:"star",cn:"星星"},{en:"snow",cn:"雪/下雪"},{en:"sky",cn:"天空"},{en:"wind",cn:"风"},{en:"cloud",cn:"云"},{en:"cloud",cn:"云"},{en:"tree",cn:"树"},{en:"hot",cn:"热的"},{en:"flower",cn:"花"},{en:"cold",cn:"冷的"},{en:"eat",cn:"吃"},{en:"come",cn:"来"},{en:"drink",cn:"喝"},{en:"walk",cn:"走"},{en:"sleep",cn:"睡觉"},{en:"run",cn:"跑"},{en:"look",cn:"看(动作)"},{en:"jump",cn:"跳"},{en:"see",cn:"看见(结果)"},{en:"swim",cn:"游泳"},{en:"watch",cn:"观看(电视/比赛)"},{en:"fly",cn:"飞"},{en:"listen",cn:"听(动作)"},{en:"play",cn:"玩/打(球)"},{en:"hear",cn:"听见(结果)"},{en:"speak",cn:"说(语言)"},{en:"make",cn:"制作"},{en:"talk",cn:"交谈/讨论"},{en:"read",cn:"读/阅读"},{en:"help",cn:"帮助"},{en:"write",cn:"写"},{en:"buy",cn:"买"},{en:"sing",cn:"唱"},{en:"sell",cn:"卖"},{en:"dance",cn:"跳舞"},{en:"open",cn:"打开"},{en:"draw",cn:"画"},{en:"close",cn:"关闭"},{en:"give",cn:"给"},{en:"get",cn:"得到/到达"},{en:"like",cn:"喜欢"},{en:"take",cn:"拿走/花费"},{en:"love",cn:"爱"},{en:"bring",cn:"带来"},{en:"want",cn:"想要"},{en:"sit",cn:"坐"},{en:"need",cn:"需要"},{en:"stand",cn:"站"},{en:"think",cn:"思考/认为"},{en:"know",cn:"知道/认识"},{en:"stop",cn:"停止"},{en:"big",cn:"大的"},{en:"small",cn:"小的"},{en:"long",cn:"长的"},{en:"short",cn:"短的/矮的"},{en:"tall",cn:"高的"},{en:"fat",cn:"胖的"},{en:"thin",cn:"瘦的"},{en:"heavy",cn:"重的"},{en:"good",cn:"好的"},{en:"bad",cn:"坏的/差的"},{en:"new",cn:"新的"},{en:"old",cn:"旧的/老的"},{en:"young",cn:"年轻的"},{en:"happy",cn:"快乐的"},{en:"sad",cn:"伤心的"},{en:"angry",cn:"生气的"},{en:"fast",cn:"快的"},{en:"slow",cn:"慢的"},{en:"ugly",cn:"丑陋的"},{en:"right",cn:"对的/右边的"},{en:"wrong",cn:"错的"},{en:"easy",cn:"简单的"},{en:"clean",cn:"干净的"},{en:"dirty",cn:"脏的"},{en:"car",cn:"小汽车"},{en:"ship",cn:"轮船"},{en:"bus",cn:"公交车"},{en:"boat",cn:"小船"},{en:"train",cn:"火车"},{en:"taxi",cn:"出租车"},{en:"subway",cn:"地铁"},{en:"truck",cn:"卡车"},{en:"time",cn:"时间"},{en:"morning",cn:"早上/上午"},{en:"year",cn:"年"},{en:"month",cn:"月"},{en:"evening",cn:"傍晚/晚上"},{en:"week",cn:"周/星期"},{en:"night",cn:"夜晚"},{en:"day",cn:"天/日"},{en:"today",cn:"今天"},{en:"hour",cn:"小时"},{en:"tomorrow",cn:"明天"},{en:"minute",cn:"分钟"},{en:"spring",cn:"春天"},{en:"summer",cn:"夏天"},{en:"winter",cn:"冬天"},{en:"doctor",cn:"医生"},{en:"nurse",cn:"护士"},{en:"worker",cn:"工人"},{en:"driver",cn:"司机"},{en:"singer",cn:"歌手"},{en:"farmer",cn:"农民"},{en:"dancer",cn:"舞者"},{en:"postman",cn:"邮递员"},{en:"park",cn:"公园"},{en:"zoo",cn:"动物园"},{en:"cinema",cn:"电影院"},{en:"library",cn:"图书馆"},{en:"hospital",cn:"医院"},{en:"farm",cn:"农场"},{en:"bank",cn:"银行"},{en:"city",cn:"城市"},{en:"sport",cn:"运动"},{en:"hobby",cn:"爱好"},{en:"game",cn:"游戏/比赛"},{en:"art",cn:"美术/艺术"},{en:"chess",cn:"国际象棋"},{en:"music",cn:"音乐"},{en:"kite",cn:"风筝"}];
-const WORDS_MED=[{en:"subject",cn:"科目 / 学科"},{en:"grade",cn:"成绩 / 年级"},{en:"term",cn:"学期"},{en:"uniform",cn:"校服"},{en:"progress",cn:"进步"},{en:"grammar",cn:"语法"},{en:"sentence",cn:"句子"},{en:"article",cn:"文章"},{en:"note",cn:"笔记"},{en:"rule",cn:"规则 / 定律"},{en:"project",cn:"项目 / 课题"},{en:"task",cn:"任务"},{en:"success",cn:"成功"},{en:"improve",cn:"提高 / 改善"},{en:"achieve",cn:"实现 / 达到"},{en:"discover",cn:"发现"},{en:"invent",cn:"发明"},{en:"provide",cn:"提供"},{en:"require",cn:"要求 / 需要"},{en:"suggest",cn:"建议"},{en:"expect",cn:"期待 / 预期"},{en:"guess",cn:"猜想"},{en:"mean",cn:"意思是 / 意味着"},{en:"explain",cn:"解释"},{en:"describe",cn:"描述"},{en:"remember",cn:"记得 / 记住"},{en:"forget",cn:"忘记"},{en:"choose",cn:"选择"},{en:"decide",cn:"决定"},{en:"nervous",cn:"紧张的"},{en:"proud",cn:"骄傲的 / 自豪的"},{en:"shy",cn:"害羞的"},{en:"lonely",cn:"孤独的"},{en:"friendly",cn:"友好的"},{en:"patient",cn:"有耐心的"},{en:"strict",cn:"严格的"},{en:"honest",cn:"诚实的"},{en:"brave",cn:"勇敢的"},{en:"crazy",cn:"疯狂的"},{en:"stupid",cn:"愚蠢的"},{en:"excited",cn:"兴奋的"},{en:"relaxed",cn:"放松的"},{en:"tired",cn:"疲惫的"},{en:"careful",cn:"小心的 / 仔细的"},{en:"careless",cn:"粗心的"},{en:"terrible",cn:"糟糕的 / 可怕的"},{en:"normal",cn:"正常的"},{en:"special",cn:"特殊的 / 特别的"},{en:"serious",cn:"严肃的 / 严重的"},{en:"common",cn:"常见的 / 普通的"},{en:"popular",cn:"受欢迎的"},{en:"famous",cn:"著名的"},{en:"cheap",cn:"便宜的"},{en:"valuable",cn:"有价值的"},{en:"useless",cn:"无用的"},{en:"rich",cn:"富有的"},{en:"poor",cn:"贫穷的 / 可怜的"},{en:"safe",cn:"安全的"},{en:"health",cn:"健康"},{en:"disease",cn:"疾病"},{en:"medicine",cn:"药"},{en:"pill",cn:"药丸"},{en:"patient",cn:"病人"},{en:"dentist",cn:"牙医"},{en:"fever",cn:"发烧"},{en:"cough",cn:"咳嗽"},{en:"headache",cn:"头痛"},{en:"stomach",cn:"胃 / 肚子"},{en:"throat",cn:"喉咙"},{en:"blind",cn:"盲的 / 失明的"},{en:"deaf",cn:"聋的"},{en:"hurt",cn:"受伤 / 疼痛"},{en:"recover",cn:"恢复 / 康复"},{en:"nature",cn:"自然"},{en:"resource",cn:"资源"},{en:"earth",cn:"地球"},{en:"planet",cn:"星球 / 行星"},{en:"mountain",cn:"高山"},{en:"forest",cn:"森林"},{en:"ocean",cn:"海洋"},{en:"river",cn:"河流"},{en:"island",cn:"岛屿"},{en:"beach",cn:"海滩"},{en:"climate",cn:"气候"},{en:"weather",cn:"天气"},{en:"protect",cn:"保护"},{en:"destroy",cn:"破坏 / 毁灭"},{en:"culture",cn:"文化"},{en:"history",cn:"历史"},{en:"society",cn:"社会"},{en:"law",cn:"法律"},{en:"custom",cn:"风俗 / 习惯"},{en:"festival",cn:"节日"},{en:"party",cn:"聚会 / 派对"},{en:"activity",cn:"活动"},{en:"reason",cn:"原因"},{en:"result",cn:"结果"},{en:"machine",cn:"机器"},{en:"internet",cn:"互联网"},{en:"website",cn:"网站"},{en:"screen",cn:"屏幕"},{en:"keyboard",cn:"键盘"},{en:"program",cn:"程序 / 节目"},{en:"message",cn:"消息 / 信息"},{en:"camera",cn:"照相机"},{en:"download",cn:"下载"},{en:"search",cn:"搜索 / 寻找"},{en:"tool",cn:"工具"},{en:"engine",cn:"引擎 / 发动机"},{en:"traffic",cn:"交通"},{en:"accident",cn:"事故 / 意外"},{en:"tourist",cn:"游客"},{en:"flight",cn:"航班"},{en:"railway",cn:"铁路"},{en:"passport",cn:"护照"},{en:"ticket",cn:"票"},{en:"distance",cn:"距离"},{en:"journey",cn:"旅程"},{en:"tour",cn:"旅行 / 观光"},{en:"arrive",cn:"到达"},{en:"leave",cn:"离开"},{en:"bridge",cn:"桥梁"},{en:"cross",cn:"穿过 / 越过"},{en:"always",cn:"总是"},{en:"usually",cn:"通常"},{en:"often",cn:"经常"},{en:"never",cn:"从不"},{en:"hardly",cn:"几乎不"},{en:"already",cn:"已经"},{en:"yet",cn:"还(没) / 已经"},{en:"exactly",cn:"确切地 / 精确地"},{en:"probably",cn:"很可能"},{en:"luckily",cn:"幸运地"},{en:"suddenly",cn:"突然地"},{en:"together",cn:"一起"},{en:"alone",cn:"单独地 / 独自"},{en:"relative",cn:"亲戚"},{en:"guest",cn:"客人"},{en:"neighbor",cn:"邻居"},{en:"host",cn:"主人 / 主持人"},{en:"stranger",cn:"陌生人"},{en:"captain",cn:"队长 / 船长"},{en:"partner",cn:"搭档 / 伙伴"},{en:"member",cn:"成员"},{en:"coach",cn:"教练"},{en:"manager",cn:"经理"},{en:"customer",cn:"顾客"},{en:"hero",cn:"英雄"},{en:"leader",cn:"领导者"},{en:"adult",cn:"成年人"},{en:"promise",cn:"保证 / 承诺"},{en:"discuss",cn:"讨论"},{en:"invite",cn:"邀请"},{en:"argue",cn:"争论"},{en:"agree",cn:"同意"},{en:"warn",cn:"警告"},{en:"refuse",cn:"拒绝"},{en:"accept",cn:"接受"},{en:"praise",cn:"赞扬 / 表扬"},{en:"reply",cn:"回复 / 回答"},{en:"complain",cn:"抱怨"},{en:"appear",cn:"出现"},{en:"produce",cn:"生产 / 制造"},{en:"cause",cn:"引起 / 导致"},{en:"happen",cn:"发生"},{en:"prevent",cn:"阻止 / 预防"},{en:"continue",cn:"继续"},{en:"finish",cn:"完成"},{en:"change",cn:"改变 / 变化"},{en:"prepare",cn:"准备"},{en:"mix",cn:"混合"},{en:"separate",cn:"分开 / 分离"},{en:"material",cn:"材料 / 物质"},{en:"cotton",cn:"棉花 / 棉织物"},{en:"metal",cn:"金属"},{en:"silk",cn:"丝绸"},{en:"plastic",cn:"塑料"},{en:"oil",cn:"油 / 石油"},{en:"glass",cn:"玻璃"},{en:"stone",cn:"石头"},{en:"wood",cn:"木头 / 木材"},{en:"sand",cn:"沙子"},{en:"gold",cn:"黄金"},{en:"leather",cn:"皮革"},{en:"silver",cn:"银"},{en:"steel",cn:"钢 / 钢铁"},{en:"price",cn:"价格"},{en:"business",cn:"商业 / 生意"},{en:"cost",cn:"花费 / 成本"},{en:"company",cn:"公司"},{en:"value",cn:"价值"},{en:"market",cn:"市场"},{en:"coin",cn:"硬币"},{en:"deal",cn:"交易 / 处理"},{en:"cash",cn:"现金"},{en:"trade",cn:"贸易 / 交易"},{en:"wallet",cn:"钱包"},{en:"wealth",cn:"财富"},{en:"bill",cn:"账单 / 钞票"},{en:"salary",cn:"薪水 / 工资"},{en:"recipe",cn:"食谱"},{en:"sweet",cn:"甜的"},{en:"menu",cn:"菜单"},{en:"sour",cn:"酸的"},{en:"boil",cn:"煮沸"},{en:"bitter",cn:"苦的"},{en:"fry",cn:"煎 / 炒"},{en:"spicy",cn:"辣的"},{en:"bake",cn:"烘焙 / 烤"},{en:"salty",cn:"咸的"},{en:"roast",cn:"烤 (肉类)"},{en:"fresh",cn:"新鲜的"},{en:"taste",cn:"品尝 / 味道"},{en:"serve",cn:"上菜 / 服务"},{en:"smell",cn:"闻 / 气味"},{en:"mirror",cn:"镜子"},{en:"drawer",cn:"抽屉"},{en:"comb",cn:"梳子"},{en:"shelf",cn:"架子"},{en:"carpet",cn:"地毯"},{en:"towel",cn:"毛巾"},{en:"curtain",cn:"窗帘"},{en:"soap",cn:"肥皂"},{en:"blanket",cn:"毯子"},{en:"trash",cn:"垃圾"},{en:"scissors",cn:"剪刀"},{en:"basket",cn:"篮子"},{en:"match",cn:"火柴 / 比赛"},{en:"idea",cn:"想法 / 主意"},{en:"courage",cn:"勇气"},{en:"memory",cn:"记忆 / 回忆"},{en:"energy",cn:"能量 / 精力"},{en:"dream",cn:"梦想 / 梦"},{en:"power",cn:"力量 / 权力"},{en:"truth",cn:"真相 / 真理"},{en:"purpose",cn:"目的 / 意图"},{en:"secret",cn:"秘密"},{en:"spirit",cn:"精神"},{en:"chance",cn:"机会"},{en:"honor",cn:"荣誉 / 荣幸"},{en:"choice",cn:"选择"},{en:"lie",cn:"谎言"},{en:"shape",cn:"形状"},{en:"weight",cn:"重量"},{en:"circle",cn:"圆形"},{en:"height",cn:"高度"},{en:"square",cn:"正方形 / 广场"},{en:"size",cn:"尺寸 / 大小"},{en:"triangle",cn:"三角形"},{en:"length",cn:"长度"},{en:"line",cn:"线 / 排"},{en:"double",cn:"双倍的"},{en:"hole",cn:"洞 / 孔"},{en:"single",cn:"单一的 / 单身的"},{en:"half",cn:"一半"},{en:"quarter",cn:"四分之一 / 一刻钟"},{en:"through",cn:"穿过 (内部)"},{en:"until",cn:"直到...为止"},{en:"across",cn:"穿过 (表面)"},{en:"unless",cn:"除非"},{en:"against",cn:"反对 / 靠着"},{en:"although",cn:"虽然 / 尽管"},{en:"beyond",cn:"超出 / 在...那边"},{en:"whether",cn:"是否"},{en:"without",cn:"没有"},{en:"neither",cn:"两者都不"},{en:"instead",cn:"代替 / 反而"},{en:"either",cn:"两者之一 / 也"},{en:"whatever",cn:"无论什么"},{en:"whoever",cn:"无论谁"},{en:"disaster",cn:"灾难"},{en:"flood",cn:"洪水"},{en:"danger",cn:"危险"},{en:"storm",cn:"暴风雨"},{en:"warning",cn:"警告 / 预警"},{en:"typhoon",cn:"台风"},{en:"rescue",cn:"营救 / 救援"},{en:"fire",cn:"火灾 / 火"},{en:"survive",cn:"幸存 / 存活"},{en:"drop",cn:"掉落 / 倒下"},{en:"escape",cn:"逃跑 / 逃脱"},{en:"hide",cn:"躲藏 / 隐藏"},{en:"east",cn:"东 / 东方的"},{en:"north",cn:"北 / 北方的"},{en:"west",cn:"西 / 西方的"},{en:"south",cn:"南 / 南方的"},{en:"center",cn:"中心"},{en:"capital",cn:"首都 / 省会"},{en:"local",cn:"当地的 / 本地的"},{en:"surface",cn:"表面"},{en:"bottom",cn:"底部"},{en:"edge",cn:"边缘"},{en:"middle",cn:"中间"},{en:"corner",cn:"角落 / 拐角"},{en:"straight",cn:"直的 / 径直地"},{en:"blood",cn:"血 / 血液"},{en:"skin",cn:"皮肤"},{en:"heart",cn:"心脏"},{en:"bone",cn:"骨头"},{en:"brain",cn:"大脑"},{en:"neck",cn:"脖子"},{en:"shoulder",cn:"肩膀"},{en:"knee",cn:"膝盖"},{en:"breath",cn:"呼吸 (名词)"},{en:"breathe",cn:"呼吸 (动词)"},{en:"pale",cn:"苍白的"},{en:"weak",cn:"虚弱的"},{en:"ache",cn:"疼痛 (如headache)"},{en:"virus",cn:"病毒"},{en:"medical",cn:"医疗的 / 医学的"},{en:"concert",cn:"音乐会"},{en:"magazine",cn:"杂志"},{en:"review",cn:"评论 / 复习"},{en:"painting",cn:"绘画 / 油画"},{en:"director",cn:"导演 / 主任"},{en:"role",cn:"角色"},{en:"magic",cn:"魔术 / 魔法"},{en:"cartoon",cn:"卡通 / 动画片"},{en:"channel",cn:"频道"},{en:"record",cn:"记录 / 唱片"},{en:"legal",cn:"合法的"},{en:"illegal",cn:"非法的"},{en:"punish",cn:"惩罚"},{en:"duty",cn:"责任 / 义务"},{en:"steal",cn:"偷窃"},{en:"rob",cn:"抢劫"},{en:"thief",cn:"小偷"},{en:"crime",cn:"犯罪"},{en:"guard",cn:"警卫 / 守卫"},{en:"right",cn:"权利 (复数rights)"},{en:"fair",cn:"公平的"},{en:"unfair",cn:"不公平的"},{en:"polite",cn:"有礼貌的"},{en:"rude",cn:"粗鲁的 / 无礼的"},{en:"connect",cn:"连接"},{en:"document",cn:"文档"},{en:"file",cn:"文件"},{en:"software",cn:"软件"},{en:"hardware",cn:"硬件"},{en:"password",cn:"密码"},{en:"signal",cn:"信号"},{en:"battery",cn:"电池"},{en:"charge",cn:"充电 / 收费"},{en:"copy",cn:"复制"},{en:"paste",cn:"粘贴"},{en:"race",cn:"赛跑 / 竞速"},{en:"match",cn:"比赛 / 火柴"},{en:"champion",cn:"冠军"},{en:"victory",cn:"胜利"},{en:"defeat",cn:"击败 / 战胜"},{en:"score",cn:"得分"},{en:"athlete",cn:"运动员"},{en:"training",cn:"训练"},{en:"throw",cn:"投 / 扔"},{en:"catch",cn:"抓住 / 接住"},{en:"hit",cn:"击打 / 碰撞"},{en:"kick",cn:"踢"},{en:"pass",cn:"传递 / 通过"},{en:"tie",cn:"平局 / 领带"}];
-const WORDS_HARD=[{en:"academy",cn:"学院 / 研究院"},{en:"academic",cn:"学术的 / 学习良好的"},{en:"campus",cn:"校园"},{en:"lecture",cn:"讲座 / 讲课"},{en:"semester",cn:"学期"},{en:"analyze",cn:"分析"},{en:"evaluate",cn:"评估 / 评价"},{en:"concept",cn:"概念 / 观念"},{en:"theory",cn:"理论"},{en:"essay",cn:"散文 / 短文 / 论文"},{en:"register",cn:"注册 / 登记"},{en:"absence",cn:"缺席 / 缺乏"},{en:"presence",cn:"出席 / 存在"},{en:"access",cn:"通道 / (使用)机会"},{en:"evidence",cn:"证据 / 证明"},{en:"identity",cn:"身份"},{en:"sequence",cn:"顺序 / 序列"},{en:"symptom",cn:"症状"},{en:"assume",cn:"假定 / 承担"},{en:"estimate",cn:"估计 / 估算"},{en:"hesitate",cn:"犹豫"},{en:"ignore",cn:"忽视 / 不理睬"},{en:"perceive",cn:"察觉 / 认知"},{en:"reflect",cn:"反射 / 反思"},{en:"tolerate",cn:"容忍 / 忍受"},{en:"suspect",cn:"怀疑 / 嫌疑人"},{en:"advocate",cn:"提倡 / 拥护"},{en:"confess",cn:"坦白 / 承认"},{en:"consult",cn:"咨询 / 请教"},{en:"abandon",cn:"放弃 / 抛弃"},{en:"absorb",cn:"吸收 / 吸引"},{en:"adapt",cn:"适应 / 改编"},{en:"allocate",cn:"分配"},{en:"boom",cn:"繁荣 / 激增"},{en:"commit",cn:"犯(错误) / 承诺"},{en:"declare",cn:"宣布 / 声明"},{en:"deserve",cn:"值得 / 应受"},{en:"maintain",cn:"维持 / 保养"},{en:"promote",cn:"促进 / 晋升"},{en:"purchase",cn:"购买"},{en:"anxious",cn:"焦虑的 / 渴望的"},{en:"arrogant",cn:"傲慢的"},{en:"cautious",cn:"谨慎的"},{en:"generous",cn:"慷慨的 / 大方的"},{en:"grateful",cn:"感激的"},{en:"innocent",cn:"无辜的 / 天真的"},{en:"reliable",cn:"可靠的"},{en:"stubborn",cn:"固执的 / 顽固的"},{en:"absolute",cn:"绝对的"},{en:"abundant",cn:"丰富的 / 充裕的"},{en:"abstract",cn:"抽象的"},{en:"accurate",cn:"准确的 / 精确的"},{en:"adequate",cn:"充足的 / 足够的"},{en:"complex",cn:"复杂的"},{en:"constant",cn:"不断的 / 恒定的"},{en:"crucial",cn:"至关重要的"},{en:"delicate",cn:"精致的 / 脆弱的"},{en:"dynamic",cn:"动态的 / 充满活力的"},{en:"flexible",cn:"灵活的 / 柔韧的"},{en:"maximum",cn:"最大的"},{en:"minimum",cn:"最小的"},{en:"biology",cn:"生物学"},{en:"gene",cn:"基因"},{en:"gravity",cn:"重力 / 引力"},{en:"carbon",cn:"碳"},{en:"species",cn:"物种 (单复数同形)"},{en:"toxic",cn:"有毒的"},{en:"universe",cn:"宇宙"},{en:"volcano",cn:"火山"},{en:"chemical",cn:"化学物质 / 化学的"},{en:"budget",cn:"预算"},{en:"campaign",cn:"运动 / 战役"},{en:"charity",cn:"慈善(机构)"},{en:"currency",cn:"货币 / 流通"},{en:"economy",cn:"经济"},{en:"justice",cn:"正义 / 司法"},{en:"penalty",cn:"惩罚 / 罚款"},{en:"policy",cn:"政策 / 方针"},{en:"welfare",cn:"福利"},{en:"security",cn:"安全 / 保障"},{en:"violence",cn:"暴力"},{en:"career",cn:"职业 / 事业"},{en:"employ",cn:"雇佣"},{en:"employee",cn:"雇员 / 员工"},{en:"employer",cn:"雇主 / 老板"},{en:"retire",cn:"退休"},{en:"resign",cn:"辞职"},{en:"apply",cn:"申请 (apply for)"},{en:"profit",cn:"利润 / 获益"},{en:"budget",cn:"预算"},{en:"invest",cn:"投资"},{en:"import",cn:"进口 / 输入"},{en:"export",cn:"出口 / 输出"},{en:"contract",cn:"合同 / 契约"},{en:"surgeon",cn:"外科医生"},{en:"bacteria",cn:"细菌"},{en:"clinic",cn:"诊所"},{en:"capsule",cn:"胶囊 / 太空舱"},{en:"mental",cn:"精神的 / 脑力的"},{en:"anxiety",cn:"焦虑 / 渴望"},{en:"severe",cn:"严重的 / 严厉的"},{en:"mild",cn:"温和的 / 轻微的"},{en:"immune",cn:"免疫的"},{en:"overcome",cn:"克服 / 战胜"},{en:"therapy",cn:"治疗 / 疗法"},{en:"disabled",cn:"残疾的 / 丧失能力的"},{en:"bleed",cn:"流血"},{en:"heal",cn:"治愈 / 愈合"},{en:"fatigue",cn:"疲劳 / 劳累"},{en:"classic",cn:"经典的 / 名著"},{en:"ancient",cn:"古代的 / 古老的"},{en:"heritage",cn:"遗产"},{en:"legend",cn:"传奇 / 传说"},{en:"myth",cn:"神话"},{en:"religion",cn:"宗教"},{en:"gallery",cn:"画廊 / 美术馆"},{en:"historic",cn:"有历史意义的"},{en:"unique",cn:"独特的 / 唯一的"},{en:"diverse",cn:"多种多样的"},{en:"somehow",cn:"以某种方式 / 不知怎么地"},{en:"namely",cn:"即 / 也就是"},{en:"merely",cn:"仅仅 / 只不过"},{en:"however",cn:"然而 (常加逗号)"},{en:"moreover",cn:"此外 / 而且"},{en:"adapt",cn:"适应 / 改编"},{en:"adopt",cn:"收养 / 采纳"},{en:"affect",cn:"影响 (动词)"},{en:"effect",cn:"效果 / 影响 (名词)"},{en:"award",cn:"奖品 / 授予"},{en:"reward",cn:"回报 / 报酬"},{en:"sensible",cn:"明智的 / 合理的"},{en:"economic",cn:"经济(上)的"}];
-const WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
+let WORDS_EASY=[], WORDS_MED=[], WORDS_HARD=[];
+let WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
+let wordsLoaded=false;
+fetch('words.json').then(r=>r.json()).then(data=>{
+  WORDS_EASY=data.easy;WORDS_MED=data.medium;WORDS_HARD=data.hard;
+  WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
+  wordsLoaded=true;
+}).catch(e=>console.error('词库加载失败',e));
 
 const GAME_DURATION=90;
 const FINAL_PHASE=30;
@@ -1376,6 +1514,7 @@ function setStatus(text,player){
 }
 
 function startGame(){
+  if(!wordsLoaded){alert('词库加载中，请稍候...');return;}
   document.getElementById('startOverlay').classList.add('hidden');
   document.getElementById('countdownOverlay').classList.remove('hidden');
   let count=3;document.getElementById('countdownText').textContent=count;playSound(440,0.15);
@@ -1606,6 +1745,16 @@ function showRules(){document.getElementById('rulesOverlay').classList.remove('h
 function hideRules(){document.getElementById('rulesOverlay').classList.add('hidden');}
 function openSettings(){document.getElementById('settingsOverlay').classList.remove('hidden');}
 function closeSettings(){document.getElementById('settingsOverlay').classList.add('hidden');}
+function switchSettingsTab(tab){
+  document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.getElementById('settingsPageWordlib').classList.toggle('active',tab==='wordlib');
+  document.getElementById('settingsPageCache').classList.toggle('active',tab==='cache');
+}
+function onLibToggle(){
+  const priv=document.getElementById('chkPrivateLib').checked;
+  document.querySelectorAll('#privateLibGroup .settings-lib-btn').forEach(b=>b.disabled=!priv);
+}
+function saveSettings(){closeSettings();}
 
 // ============ SOLO TOWER MODE ============
 const SOLO_STAGES=[
