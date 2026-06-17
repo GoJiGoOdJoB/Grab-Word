@@ -597,7 +597,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 #soloPanel.active { display:flex; }
 .solo-top { display:flex; width:100%; max-width:600px; justify-content:space-between; align-items:center; }
 .solo-stage-tag { font-size:15px; font-weight:bold; padding:4px 14px; border-radius:10px; background:rgba(33,120,210,0.12); color:#2178d2; }
-.solo-life-bar { display:inline-flex; align-items:center; gap:8px; padding:5px 10px; border:2px solid #e53935; border-radius:10px; }
+.solo-life-bar { display:inline-flex; align-items:center; gap:8px; padding:5px 10px; border:2px solid #4caf50; border-radius:10px; }
 .solo-life-dot { width:14px; height:14px; border-radius:50%; background:#4caf50; transition:background 0.3s; }
 .solo-life-dot.lost { background:#bdbdbd; }
 .solo-stars { font-size:18px; letter-spacing:2px; color:#d4a800; }
@@ -626,9 +626,9 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-combo-box.animating { animation:comboFlash 0.4s ease; }
 .solo-pause-btn { width:32px; height:32px; background:#fff; border:1px solid #ccc; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; cursor:pointer; }
 .solo-promote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(33,120,210,0.15); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
-.solo-promote-flash .promote-text { font-size:48px; font-weight:900; color:#2178d2; animation:settleReveal 0.6s ease; }
+.solo-promote-flash .promote-text { font-size:clamp(28px,9vw,48px); font-weight:900; color:#2178d2; animation:settleReveal 0.6s ease; text-align:center; max-width:90vw; padding:0 16px; line-height:1.2; box-sizing:border-box; }
 .solo-demote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(229,57,53,0.12); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
-.solo-demote-flash .promote-text { font-size:48px; font-weight:900; color:#e53935; animation:settleReveal 0.6s ease; }
+.solo-demote-flash .promote-text { font-size:clamp(28px,9vw,48px); font-weight:900; color:#e53935; animation:settleReveal 0.6s ease; text-align:center; max-width:90vw; padding:0 16px; line-height:1.2; box-sizing:border-box; }
 @keyframes promoteFlash { 0%{opacity:1} 70%{opacity:1} 100%{opacity:0} }
 .solo-burst-flash { position:fixed; top:0; left:0; right:0; bottom:0; z-index:92; pointer-events:none; animation:burstFade 1.8s ease forwards; }
 .solo-burst-flash.normal { box-shadow:inset 0 0 120px 40px rgba(255,235,150,0.7); }
@@ -661,7 +661,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 </head>
 <body>
 
-<div class="divider"><div class="pause-btn" onclick="pauseGame()">⏸</div></div>
+<div class="divider" style="display:none;"><div class="pause-btn" onclick="pauseGame()">⏸</div></div>
 
 <!-- Shared centered area (timer + score bar + word) -->
 <div id="pvpCenter" class="pvp-center game-hidden">
@@ -1268,6 +1268,7 @@ function startGame(){
 }
 
 function beginGame(){
+  document.querySelector('.divider').style.display='block';
   document.getElementById('splitLeft').classList.remove('game-hidden');
   document.getElementById('splitRight').classList.remove('game-hidden');
   document.getElementById('pvpCenter').classList.remove('game-hidden');
@@ -2167,16 +2168,16 @@ function soloEndGame(){
   svgHTML+='</svg>';
 
   tierSeps.forEach(ts=>{
-    svgHTML+=`<div style="position:absolute;top:${ts.y}px;left:0;right:0;display:flex;align-items:center;padding:0 40px;">
+    svgHTML+=`<div style="position:absolute;top:${ts.y}px;left:50%;transform:translateX(-50%);width:min(${svgW}px,92vw);box-sizing:border-box;display:flex;align-items:center;padding:0 20px;">
       <div style="flex:1;height:3px;background:#6abf69;border-radius:2px;"></div>
-      <span style="font-size:22px;font-weight:bold;color:#6abf69;white-space:nowrap;margin-left:12px;">${ts.name}</span>
+      <span style="font-size:clamp(16px,5vw,22px);font-weight:bold;color:#6abf69;white-space:nowrap;margin-left:12px;">${ts.name}</span>
     </div>`;
   });
 
   // nodes: squished ellipse with thick bottom shadow, filled star
   nodes.forEach(n=>{
     svgHTML+=`<div style="position:absolute;left:${n.x-nodeRx}px;top:${n.y-nodeRy}px;width:${nodeRx*2}px;height:${nodeRy*2}px;border-radius:50%;background:#6abf69;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 0 #4a8a3f;">
-      <svg width="128" height="48" viewBox="0 0 24 24" fill="#fff" stroke="none"><polygon points="12,2 15,9 22,9 16.5,14 18,21 12,17 6,21 7.5,14 2,9 9,9"/></svg>
+      <svg width="128" height="48" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><polygon points="12,2 15,9 22,9 16.5,14 18,21 12,17 6,21 7.5,14 2,9 9,9"/></svg>
     </div>`;
     // endless level number above the endless node
     if(n.stage===9 && S.endlessLevel>0){
@@ -2260,6 +2261,9 @@ document.addEventListener('keydown',(e)=>{
 window.tower_max=function(){if(selectedMode!=='solo')return 'Not in solo mode';S.stageIdx=9;S.maxStageReached=9;S.wordQueue=shuffle(WORDS_MAP[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return 'Jumped to 无尽级';};
 window.set_point=function(n){if(selectedMode!=='solo')return 'Not in solo mode';S.totalScore=n;soloUpdateStageUI();return 'Score set to '+n;};
 window.game_over=function(){if(selectedMode!=='solo')return 'Not in solo mode';soloEndGame();return 'Game ended';};
+
+// default to solo tower on load
+selectMode('solo');
 </script>
 </body>
 </html>
