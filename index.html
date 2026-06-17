@@ -501,6 +501,59 @@ body {
   user-select: none;
 }
 .case-toggle:hover { border-color: #999; }
+.settings-btn {
+  position: absolute;
+  bottom: 24px;
+  left: 82px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.settings-btn:hover { border-color: #999; }
+.settings-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+}
+.settings-overlay.hidden { display: none; }
+.settings-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 30px;
+  width: min(400px, 88vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+.settings-title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.settings-close {
+  display: block;
+  margin: 20px auto 0;
+  padding: 10px 30px;
+  font-size: 16px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #2178d2, #1565c0);
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
 .case-A { font-size: 22px; font-weight: bold; color: rgba(0,0,0,0.2); transition: color 0.2s; }
 .case-a { font-size: 18px; font-weight: bold; color: #333; transition: color 0.2s; margin-left: 1px; }
 .case-toggle.uppercase .case-A { color: #333; }
@@ -802,9 +855,24 @@ body.uppercase-mode .card { text-transform: uppercase; }
   <div class="case-toggle" id="caseToggle" onclick="toggleCase()">
     <span class="case-A" id="caseA">A</span><span class="case-a" id="casea">a</span>
   </div>
+  <div class="settings-btn" onclick="openSettings()">
+    <svg viewBox="0 0 24 24" width="28" height="28">
+      <rect x="4" y="9.5" width="16" height="5" rx="1.5" fill="#666"/>
+      <rect x="4" y="9.5" width="16" height="5" rx="1.5" fill="#666" transform="rotate(60 12 12)"/>
+      <rect x="4" y="9.5" width="16" height="5" rx="1.5" fill="#666" transform="rotate(120 12 12)"/>
+      <circle cx="12" cy="12" r="4" fill="#fff"/>
+    </svg>
+  </div>
 </div>
 
 <!-- Rules Modal -->
+<div class="settings-overlay hidden" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-modal">
+    <div class="settings-title">设置</div>
+    <div id="settingsContent"></div>
+    <button class="settings-close" onclick="closeSettings()">关闭</button>
+  </div>
+</div>
 <div class="overlay hidden" id="rulesOverlay">
   <div class="rules-modal">
     <div class="rules-title">玩法说明</div>
@@ -1424,30 +1492,61 @@ document.addEventListener('keydown',(e)=>{
   if(e.code==='NumpadSubtract')passAction('p2');
 });
 
+const _audioCtx=(function(){try{return new(window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}})();
 function playSound(freq,dur,vol){
-  try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=freq;osc.type='sine';gain.gain.setValueAtTime(vol||0.5,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+dur);osc.start();osc.stop(ctx.currentTime+dur);}catch(e){}
+  if(!_audioCtx)return;
+  try{
+    if(_audioCtx.state==='suspended')_audioCtx.resume();
+    const osc=_audioCtx.createOscillator();
+    const gain=_audioCtx.createGain();
+    osc.connect(gain);gain.connect(_audioCtx.destination);
+    osc.frequency.value=freq;osc.type='sine';
+    gain.gain.setValueAtTime(vol||0.5,_audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01,_audioCtx.currentTime+dur);
+    osc.start();osc.stop(_audioCtx.currentTime+dur);
+    osc.onended=()=>{osc.disconnect();gain.disconnect();};
+  }catch(e){}
 }
 
 const SCORE_STAR_POLY='12,1 14.5,9.5 23,12 14.5,14.5 12,23 9.5,14.5 1,12 9.5,9.5';
-function soloStarSvg(fill){
-  return `<svg viewBox="0 0 24 24"><polygon points="${SCORE_STAR_POLY}" fill="${fill}" stroke="#fff" stroke-width="1.5"/></svg>`;
+
+const _starPool=[];
+const _STAR_POOL_SIZE=36;
+(function initStarPool(){
+  for(let i=0;i<_STAR_POOL_SIZE;i++){
+    const el=document.createElement('div');
+    el.className='xp-star';
+    el.style.display='none';
+    document.body.appendChild(el);
+    _starPool.push(el);
+  }
+})();
+function _acquireStar(fill){
+  const star=_starPool.find(s=>s.style.display==='none');
+  if(!star)return null;
+  star.innerHTML=`<svg viewBox="0 0 24 24"><polygon points="${SCORE_STAR_POLY}" fill="${fill}" stroke="#fff" stroke-width="1.5"/></svg>`;
+  star.style.display='block';
+  star.style.opacity='1';
+  return star;
 }
+function _releaseStar(star){
+  star.style.display='none';
+}
+
 function soloSpawnStar(sx,sy,ex,ey,scale,fill){
-  const star=document.createElement('div');
-  star.className='xp-star';
-  star.innerHTML=soloStarSvg(fill);
+  const star=_acquireStar(fill);
+  if(!star)return;
   const jx=(Math.random()-0.5)*90, jy=(Math.random()-0.5)*70;
   const x0=sx+jx, y0=sy+jy;
   const cx=(x0+ex)/2 + (Math.random()-0.5)*220;
   const cy=Math.min(y0,ey) - (50+Math.random()*130);
   const spin=(Math.random()-0.5)*720;
-  document.body.appendChild(star);
   const dur=560+Math.random()*260;
   const t0=performance.now();
   function frame(now){
     let p=(now-t0)/dur;
-    if(p>=1){ star.remove(); soloScoreBump(); playSound(1100+Math.random()*400,0.06,0.33); return; }
-    const e=p*p*(3-2*p); // smoothstep
+    if(p>=1){ _releaseStar(star); soloScoreBump(); playSound(1100+Math.random()*400,0.06,0.33); return; }
+    const e=p*p*(3-2*p);
     const mt=1-e;
     const x=mt*mt*x0 + 2*mt*e*cx + e*e*ex;
     const y=mt*mt*y0 + 2*mt*e*cy + e*e*ey;
@@ -1472,7 +1571,7 @@ function soloFlyStars(rawEarned,isShiny,extraPts){
   if(!origin||!target)return;
   const o=origin.getBoundingClientRect();
   const t=target.getBoundingClientRect();
-  const sx=o.left+o.width/2, sy=o.top+o.height/2;
+  const sx=o.left+o.width/2, sy=o.top;
   const ex=t.left+t.width/2, ey=t.top+t.height/2;
   let idx=0;
   const baseN=Math.min(rawEarned,12);
@@ -1490,7 +1589,7 @@ function pvpFlyStars(player, rawEarned, isShiny, extraPts){
   if(!origin||!bar)return;
   const o=origin.getBoundingClientRect();
   const b=bar.getBoundingClientRect();
-  const sx=o.left+o.width/2, sy=o.top+o.height/2;
+  const sx=o.left+o.width/2, sy=o.top;
   const ex=player==='p1'? b.left+14 : b.right-14;
   const ey=b.top+b.height/2;
   let idx=0;
@@ -1505,6 +1604,8 @@ function pvpFlyStars(player, rawEarned, isShiny, extraPts){
 
 function showRules(){document.getElementById('rulesOverlay').classList.remove('hidden');}
 function hideRules(){document.getElementById('rulesOverlay').classList.add('hidden');}
+function openSettings(){document.getElementById('settingsOverlay').classList.remove('hidden');}
+function closeSettings(){document.getElementById('settingsOverlay').classList.add('hidden');}
 
 // ============ SOLO TOWER MODE ============
 const SOLO_STAGES=[
