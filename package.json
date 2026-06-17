@@ -1,0 +1,9 @@
+{
+  "name": "grab-word",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve . -p 3000 -s",
+    "start": "npx serve . -p 3000 -s"
+  }
+}
