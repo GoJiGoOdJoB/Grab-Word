@@ -327,6 +327,8 @@ body {
   border-radius: 8px;
   background: #fff;
   min-height: 38px;
+  overflow: hidden;
+  min-height: 0;
 }
 .split.right .book-section { border-color: #e0e0e0; }
 .book-label {
@@ -336,10 +338,10 @@ body {
 }
 .wordbook {
   flex: 1;
-  max-height: 100%;
   align-self: stretch;
   overflow-y: auto;
   font-size: 14px;
+  min-height: 0;
 }
 .wordbook-item {
   display: inline-block;
@@ -368,20 +370,21 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 30px;
-  height: 30px;
+  padding: 5px 10px;
   background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 50%;
+  border: 2px solid #ccc;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
+  font-weight: bold;
   cursor: pointer;
   z-index: 11;
   transition: all 0.2s;
+  white-space: nowrap;
 }
-.pause-btn:hover { background: #f0f0f0; transform: translate(-50%,-50%) scale(1.15); }
+.pause-btn:hover { background: #f0f0f0; transform: translate(-50%,-50%) scale(1.08); }
 
 /* Overlays */
 .overlay {
@@ -620,11 +623,11 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-word-section.entering .current-word { opacity:1; transform:translateY(0); }
 .solo-cards-section { width:100%; max-width:600px; display:flex; flex-direction:column; align-items:center; gap:4px; }
 .solo-cards-section .card { background:#fff; border:2px solid #2178d2; color:#2178d2; }
-.solo-book-section { width:100%; max-width:600px; display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #e0e0e0; border-radius:8px; background:#fff; min-height:38px; }
+.solo-book-section { width:100%; max-width:600px; display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border:1px solid #e0e0e0; border-radius:8px; background:#fff; min-height:38px; flex:1; overflow:hidden; min-height:0; }
 .solo-book-section .wordbook-item { background:rgba(33,120,210,0.08); color:#2178d2; }
 .solo-combo-box { position:absolute; top:12px; right:20px; font-size:36px; font-weight:900; color:#e53935; z-index:5; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
 .solo-combo-box.animating { animation:comboFlash 0.4s ease; }
-.solo-pause-btn { width:32px; height:32px; background:#fff; border:1px solid #ccc; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; cursor:pointer; }
+.solo-pause-btn { padding:5px 10px; background:#fff; border:2px solid #ccc; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
 .solo-promote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(33,120,210,0.15); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
 .solo-promote-flash .promote-text { font-size:clamp(28px,9vw,48px); font-weight:900; color:#2178d2; animation:settleReveal 0.6s ease; text-align:center; max-width:90vw; padding:0 16px; line-height:1.2; box-sizing:border-box; }
 .solo-demote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(229,57,53,0.12); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
@@ -661,7 +664,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 </head>
 <body>
 
-<div class="divider" style="display:none;"><div class="pause-btn" onclick="pauseGame()">⏸</div></div>
+<div class="divider" style="display:none;"><div class="pause-btn" onclick="pauseGame()">暂停</div></div>
 
 <!-- Shared centered area (timer + score bar + word) -->
 <div id="pvpCenter" class="pvp-center game-hidden">
@@ -719,7 +722,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
         <span class="solo-life-dot"></span>
         <span class="solo-life-dot"></span>
       </div>
-      <div class="solo-pause-btn" onclick="soloPauseGame()">&#9208;</div>
+      <div class="solo-pause-btn" onclick="soloPauseGame()">暂停</div>
     </div>
   </div>
   <div class="solo-score-area">
@@ -1222,7 +1225,8 @@ function addWordBook(player){
   const book=document.getElementById(player==='p1'?'p1Book':'p2Book');
   const item=document.createElement('span');item.className='wordbook-item';
   item.innerHTML=`${G.currentWord.en}<br><span class="wb-cn">${G.currentWord.cn}</span>`;
-  book.prepend(item);
+  book.appendChild(item);
+  book.scrollTop=book.scrollHeight;
 }
 
 function updateScores(){
@@ -2121,7 +2125,8 @@ function soloAddWordBook(){
   const book=document.getElementById('soloBook');
   const item=document.createElement('span');item.className='wordbook-item';
   item.innerHTML=`${S.currentWord.en}<br><span class="wb-cn">${S.currentWord.cn}</span>`;
-  book.prepend(item);
+  book.appendChild(item);
+  book.scrollTop=book.scrollHeight;
 }
 
 function soloEndGame(){
