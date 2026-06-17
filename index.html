@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>抢词夺力 - 本地分屏对战</title>
+<meta name="description" content="一个普通的拼词游戏">
+<title>抢词夺力</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -51,7 +52,7 @@ body {
 .pvp-center.game-hidden { display: none; }
 .pvp-center .score-section,
 .pvp-center .word-section { pointer-events: auto; }
-.pvp-center .word-section { max-height: none; height: auto; min-height: clamp(150px, 30vh, 240px); }
+.pvp-center .word-section { max-height: none; height: auto; min-height: auto; padding: 12px 10px; }
 
 /* In merged layout, splits only hold cards + book; cards pushed up below center area, book grows tall */
 .split { justify-content: flex-start; padding-top: clamp(240px, 48vh, 365px); }
@@ -177,16 +178,17 @@ body {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(4px, 1.5vw, 10px);
+  gap: clamp(0px, 0.3vw, 2px);
   transition: all 0.25s;
   max-width: 100%;
 }
 .letter-slot {
-  width: clamp(38px, 11vw, 70px);
+  width: auto;
+  min-width: clamp(22px, 6vw, 38px);
   height: clamp(46px, 13vw, 82px);
-  background: #fff;
-  border: 2px solid #ccc;
-  border-radius: 10px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -194,29 +196,34 @@ body {
   font-weight: bold;
   text-transform: lowercase;
   transition: all 0.2s;
+  padding: 0 1px;
+}
+.letter-slot.narrow {
+  min-width: clamp(16px, 4vw, 26px);
 }
 .letter-slot.filled-p1 {
-  background: rgba(33,120,210,0.1);
-  border-color: #2178d2;
   color: #2178d2;
 }
 .letter-slot.filled-p2 {
-  background: rgba(210,170,0,0.1);
-  border-color: #d4a800;
   color: #b8960a;
 }
 .letter-slot.pre-filled {
-  background: #f5f5f5;
-  border-color: #ddd;
-  color: #999;
+  color: #333;
+}
+.letter-slot.blank-slot {
+  color: #aaa;
 }
 .letter-slot.next-slot {
-  border-color: #666;
-  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+  border-color: #2178d2;
+  animation: slotBlink 0.8s ease infinite;
+}
+@keyframes slotBlink {
+  0%,100% { border-color: #2178d2; }
+  50% { border-color: transparent; }
 }
 .letter-slot.bling { animation: bling 0.35s ease; }
 .word-status { font-size: 13px; height: 16px; color: #e53935; font-weight: bold; }
-#soloStatus { font-size: 18px; height: auto; min-height: 20px; line-height: 1.5; }
+#soloStatus { position:absolute; top:70px; right:20px; font-size:18px; height:auto; min-height:20px; line-height:1.5; text-align:right; z-index:5; color:#f5a623; font-weight:bold; max-width:45vw; }
 
 .word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; }
 .word-star { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; }
@@ -385,6 +392,8 @@ body {
   white-space: nowrap;
 }
 .pause-btn:hover { background: #f0f0f0; transform: translate(-50%,-50%) scale(1.08); }
+.pvp-pause-btn { padding:5px 10px; background:#fff; border:2px solid #ccc; border-radius:10px; font-size:12px; font-weight:bold; cursor:pointer; pointer-events:auto; transition:all 0.2s; }
+.pvp-pause-btn:hover { background:#f0f0f0; transform:scale(1.08); }
 
 /* Overlays */
 .overlay {
@@ -650,6 +659,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
   .combo-p1 { left: 6px; }
   .combo-p2 { right: 6px; }
   .solo-combo-box { font-size: 24px; right: 10px; }
+  #soloStatus { top: 58px; right: 10px; font-size: 16px; }
   .pvp-center { top: 30px; width: 96vw; gap: 4px; }
   .timer-display { font-size: 18px; }
   .score-bar { height: 22px; }
@@ -664,7 +674,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 </head>
 <body>
 
-<div class="divider" style="display:none;"><div class="pause-btn" onclick="pauseGame()">暂停</div></div>
+<div class="divider" style="display:none;"></div>
 
 <!-- Shared centered area (timer + score bar + word) -->
 <div id="pvpCenter" class="pvp-center game-hidden">
@@ -673,6 +683,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
       <span class="timer-display timer-sync">90</span>
     </div>
   </div>
+  <div class="pvp-pause-btn" onclick="pauseGame()">暂停</div>
   <div class="score-section">
     <div class="score-bar bar-sync"><div class="score-point point-sync"></div></div>
   </div>
@@ -741,9 +752,9 @@ body.uppercase-mode .card { text-transform: uppercase; }
     <div class="current-word" id="soloWord"></div>
     <div class="word-hint-below" id="soloHint"></div>
     <div class="word-rule-below">从左往右依次填入</div>
-    <div class="word-status" id="soloStatus"></div>
     <div class="solo-word-timer"><div class="solo-word-timer-fill" id="soloWordTimerFill"></div></div>
   </div>
+  <div class="word-status" id="soloStatus"></div>
   <div class="solo-cards-section">
     <div class="hand-cards" id="soloHand"></div>
     <button class="pass-btn" onclick="soloPassAction()">PASS <span class="key-hint-inline">[ ~ ]</span></button>
@@ -996,6 +1007,7 @@ function dealHand(neededLetters,size){
 function getNextBlankIndex(){return G.slots.findIndex(s=>!s.filled);}
 
 function renderWord(container){
+  const narrowChars='iljft1!|';
   container.innerHTML='';
   const nextBlank=getNextBlankIndex();
   G.slots.forEach((slot,i)=>{
@@ -1006,7 +1018,12 @@ function renderWord(container){
       else if(slot.filledBy==='p1')div.classList.add('filled-p1');
       else if(slot.filledBy==='p2')div.classList.add('filled-p2');
       div.textContent=slot.letter;
-    }else if(i===nextBlank){div.classList.add('next-slot');}
+      if(narrowChars.includes(slot.letter.toLowerCase()))div.classList.add('narrow');
+    }else{
+      div.textContent='_';
+      div.classList.add('blank-slot');
+      if(i===nextBlank)div.classList.add('next-slot');
+    }
     container.appendChild(div);
   });
 }
@@ -1058,11 +1075,20 @@ function renderAll(){
 }
 
 function updateSlotUI(slotIdx,player){
+  const narrowChars='iljft1!|';
   document.querySelectorAll('.word-sync').forEach(container=>{
     const el=container.children[slotIdx];
-    if(el){el.textContent=G.slots[slotIdx].letter;el.className='letter-slot '+(player==='p1'?'filled-p1':'filled-p2')+' bling';setTimeout(()=>el.classList.remove('bling'),350);}
+    if(el){
+      const letter=G.slots[slotIdx].letter;
+      el.textContent=letter;
+      el.className='letter-slot '+(player==='p1'?'filled-p1':'filled-p2')+' bling'+(narrowChars.includes(letter.toLowerCase())?' narrow':'');
+      setTimeout(()=>el.classList.remove('bling'),350);
+    }
     const nextBlank=getNextBlankIndex();
-    Array.from(container.children).forEach((child,i)=>{child.classList.remove('next-slot');if(i===nextBlank&&!G.slots[i].filled)child.classList.add('next-slot');});
+    Array.from(container.children).forEach((child,i)=>{
+      child.classList.remove('next-slot');
+      if(i===nextBlank&&!G.slots[i].filled)child.classList.add('next-slot');
+    });
   });
 }
 
@@ -1127,7 +1153,9 @@ function checkWordComplete(lastPlayer){
   const totalPoints=basePoints+comboBonus;
   const shinyTag=G.isShiny?'✦':'';
   if(isP1){G.p1Score+=totalPoints;setStatus(`${shinyTag}+${totalPoints}`,'p1');}
-  else{G.p2Score+=totalPoints;setStatus(`${shinyTag}+${totalPoints}`,'p2');}  updateComboDisplay();updateScores();addWordBook(lastPlayer);
+  else{G.p2Score+=totalPoints;setStatus(`${shinyTag}+${totalPoints}`,'p2');}
+  pvpFlyStars(lastPlayer, rawBase, G.isShiny, comboBonus);
+  updateComboDisplay();updateScores();addWordBook(lastPlayer);
   if(checkWinCondition())return;
   const loserHandId=isP1?'p2Hand':'p1Hand';
   setTimeout(()=>{
@@ -1438,6 +1466,25 @@ function soloFlyStars(rawEarned,isShiny,extraPts){
   }
 }
 
+function pvpFlyStars(player, rawEarned, isShiny, extraPts){
+  const origin=document.querySelector('.word-sync');
+  const bar=document.querySelector('.bar-sync');
+  if(!origin||!bar)return;
+  const o=origin.getBoundingClientRect();
+  const b=bar.getBoundingClientRect();
+  const sx=o.left+o.width/2, sy=o.top+o.height/2;
+  const ex=player==='p1'? b.left+14 : b.right-14;
+  const ey=b.top+b.height/2;
+  let idx=0;
+  const baseN=Math.min(rawEarned,12);
+  for(let i=0;i<baseN;i++){const d=idx++;setTimeout(()=>soloSpawnStar(sx,sy,ex,ey,1,player==='p1'?'#2178d2':'#d4a800'),d*55);}
+  if(isShiny){for(let i=0;i<baseN;i++){const d=idx++;setTimeout(()=>soloSpawnStar(sx,sy,ex,ey,1,'#7e57c2'),d*55);}}
+  if(extraPts>0){
+    const scale=Math.min(1.4+extraPts*0.12,3.5);
+    setTimeout(()=>soloSpawnStar(sx,sy,ex,ey,scale,'#ffd33d'),idx*55+120);
+  }
+}
+
 function showRules(){document.getElementById('rulesOverlay').classList.remove('hidden');}
 function hideRules(){document.getElementById('rulesOverlay').classList.add('hidden');}
 
@@ -1728,6 +1775,7 @@ function soloRenderStars(){
 }
 
 function soloRenderWord(){
+  const narrowChars='iljft1!|';
   const container=document.getElementById('soloWord');
   container.innerHTML='';
   const nextBlank=S.slots.findIndex(s=>!s.filled);
@@ -1738,7 +1786,12 @@ function soloRenderWord(){
       if(slot.filledBy==='pre')div.classList.add('pre-filled');
       else div.classList.add('filled-p1');
       div.textContent=slot.letter;
-    }else if(i===nextBlank){div.classList.add('next-slot');}
+      if(narrowChars.includes(slot.letter.toLowerCase()))div.classList.add('narrow');
+    }else{
+      div.textContent='_';
+      div.classList.add('blank-slot');
+      if(i===nextBlank)div.classList.add('next-slot');
+    }
     container.appendChild(div);
   });
 }
@@ -1800,7 +1853,13 @@ function soloPlayCard(idx){
   // update slot visuals
   const container=document.getElementById('soloWord');
   const el=container.children[nextBlank];
-  if(el){el.textContent=S.slots[nextBlank].letter;el.className='letter-slot filled-p1 bling';setTimeout(()=>el.classList.remove('bling'),350);}
+  if(el){
+    const letter=S.slots[nextBlank].letter;
+    const narrowChars='iljft1!|';
+    el.textContent=letter;
+    el.className='letter-slot filled-p1 bling'+(narrowChars.includes(letter.toLowerCase())?' narrow':'');
+    setTimeout(()=>el.classList.remove('bling'),350);
+  }
   const nb2=S.slots.findIndex(s=>!s.filled);
   Array.from(container.children).forEach((ch,i)=>{ch.classList.remove('next-slot');if(i===nb2&&!S.slots[i].filled)ch.classList.add('next-slot');});
   playSound(600,0.1);
