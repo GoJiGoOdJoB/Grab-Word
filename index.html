@@ -6,7 +6,7 @@
 <meta name="description" content="一个普通的拼词游戏">
 <title>抢词夺力</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
 body {
   font-family: 'Segoe UI', sans-serif;
   background: #fff;
@@ -787,7 +787,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-score-box { font-size:32px; font-weight:900; color:#2178d2; position:relative; }
 .solo-word-timer { position:absolute; left:clamp(12px,4vw,30px); right:clamp(12px,4vw,30px); bottom:10px; width:auto; max-width:none; height:8px; border-radius:4px; background:#eee; overflow:hidden; }
 .solo-word-timer-fill { position:absolute; left:0; top:0; height:100%; width:100%; background:#4caf50; transition:width 0.1s linear, background-color 0.3s; z-index:2; }
-.solo-word-timer-ghost { position:absolute; left:0; top:0; height:100%; width:100%; background:#e84057; transition:width 0.6s ease-out; z-index:1; }
+.solo-word-timer-ghost { position:absolute; left:0; top:0; height:100%; width:0; background:#555; z-index:1; transition:width 0.3s ease-out; }
 .solo-word-section { flex:1; width:auto; min-width:0; max-width:92vw; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; border:1px solid #e0e0e0; border-radius:14px; background:rgba(255,255,255,0.7); max-height:40%; position:relative; padding:15px clamp(12px,4vw,30px) 26px; overflow:hidden; }
 .solo-word-section.shiny { background:linear-gradient(135deg,#e0f7fa,#fff,#e8daef,#d1c4e9,#e0f7fa); background-size:300% 300%; animation:shinyBg 3s ease infinite; border-color:#b39ddb; box-shadow:0 0 15px rgba(179,157,219,0.3); }
 .solo-word-section.transitioning .current-word { opacity:0; transform:translateY(-8px); }
@@ -1885,6 +1885,13 @@ function parseImportText(text){
 // init on page load
 document.addEventListener('DOMContentLoaded',initSettingsFromSave);
 
+// Disable right-click menu; use right-click as pause/back
+document.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(selectedMode==='solo'&&S.running){soloPauseGame();}
+  else if(G&&G.running){pauseGame();}
+});
+
 // ============ SOLO TOWER MODE ============
 const SOLO_STAGES=[
   // [stageIndex, label, wordBank, blanks, handSize, shinyC, promoteScore]
@@ -2055,11 +2062,10 @@ function soloApplyWrongPenalty(){
   }
   // word time penalty: reduce current layer ms (cascade across layers)
   if(p.word>0){
-    // ghost bar: show pre-damage width then animate down
     const fill=document.getElementById('soloWordTimerFill');
     const ghost=document.getElementById('soloWordTimerGhost');
+    // ghost: show at pre-damage width, then shrink + fade
     const preWidth=Math.max(0,S.wordTimerMs/4000*100);
-    if(ghost)ghost.style.width=preWidth+'%';
 
     let ms=p.word*1000;
     S.wordTimerMs-=ms;
@@ -2077,8 +2083,14 @@ function soloApplyWrongPenalty(){
       fill.style.width=postWidth+'%';
       fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
     }
-    // ghost shrinks to match fill after delay
-    if(ghost){setTimeout(()=>{ghost.style.width=postWidth+'%';},400);}
+    if(ghost){
+      ghost.style.transition='none';
+      ghost.style.width=preWidth+'%';
+      requestAnimationFrame(()=>{
+        ghost.style.transition='width 0.3s ease-out';
+        ghost.style.width=postWidth+'%';
+      });
+    }
     soloRenderStars();
     soloUpdateStageUI();
   }
@@ -2146,10 +2158,8 @@ function soloLayerColor(layer,maxLayers){
 function soloStartWordTimer(){
   clearInterval(S.wordTimer);
   const fill=document.getElementById('soloWordTimerFill');
-  const ghost=document.getElementById('soloWordTimerGhost');
   fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
   fill.style.width='100%';
-  if(ghost)ghost.style.width='100%';
   S.wordTimer=setInterval(()=>{
     if(!S.running)return;
     S.wordTimerMs-=100*S.wordFlowRate*S.globalFlowRate;
@@ -2157,10 +2167,6 @@ function soloStartWordTimer(){
     // update bar within current layer
     const ratio=Math.max(0,S.wordTimerMs/4000);
     fill.style.width=(ratio*100)+'%';
-    // ghost stays in sync during normal tick (no trailing red)
-    if(ghost && parseFloat(ghost.style.width)<=ratio*100){
-      ghost.style.width=(ratio*100)+'%';
-    }
 
     // layer boundary crossed
     if(S.wordTimerMs<=0){
