@@ -303,7 +303,8 @@ body {
 }
 .card .key-hint {
   position: absolute;
-  bottom: 5px;
+  top: 100%;
+  margin-top: 2px;
   font-size: 10px;
   opacity: 0.45;
   font-weight: normal;
@@ -774,7 +775,8 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .xp-star svg { width:100%; height:100%; display:block; }
 .solo-score-box.score-bump { animation:scoreBump 0.18s ease; }
 @keyframes scoreBump { 0%{transform:scale(1)} 50%{transform:scale(1.25)} 100%{transform:scale(1)} }
-.solo-timer { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:inline-flex; align-items:center; gap:8px; padding:6px 18px; border:2px solid #b8d4f0; border-radius:20px; background:#fff; z-index:6; }
+.solo-timer { position:absolute; top:12px; left:50%; transform:translateX(-50%); display:inline-flex; align-items:center; gap:8px; padding:6px 18px; border:2px solid #b8d4f0; border-radius:20px; background:#fff; z-index:6; transition:border-color 0.3s; }
+.solo-timer.flow-penalty { border-color: #e84057; }
 .solo-timer .timer-label { font-size:18px; font-weight:900; color:#b8d4f0; }
 .solo-timer .timer-value { font-size:26px; font-weight:bold; color:#f5a623; }
 .solo-score-area { width:100%; max-width:600px; display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; }
@@ -784,7 +786,8 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-promo-fill { height:100%; width:0%; border-radius:5px; background:linear-gradient(to right,#42a5f5,#2178d2); transition:width 0.3s; }
 .solo-score-box { font-size:32px; font-weight:900; color:#2178d2; position:relative; }
 .solo-word-timer { position:absolute; left:clamp(12px,4vw,30px); right:clamp(12px,4vw,30px); bottom:10px; width:auto; max-width:none; height:8px; border-radius:4px; background:#eee; overflow:hidden; }
-.solo-word-timer-fill { height:100%; width:100%; background:#4caf50; transition:width 0.1s linear, background-color 0.3s; }
+.solo-word-timer-fill { position:absolute; left:0; top:0; height:100%; width:100%; background:#4caf50; transition:width 0.1s linear, background-color 0.3s; z-index:2; }
+.solo-word-timer-ghost { position:absolute; left:0; top:0; height:100%; width:100%; background:#e84057; transition:width 0.6s ease-out; z-index:1; }
 .solo-word-section { flex:1; width:auto; min-width:0; max-width:92vw; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; border:1px solid #e0e0e0; border-radius:14px; background:rgba(255,255,255,0.7); max-height:40%; position:relative; padding:15px clamp(12px,4vw,30px) 26px; overflow:hidden; }
 .solo-word-section.shiny { background:linear-gradient(135deg,#e0f7fa,#fff,#e8daef,#d1c4e9,#e0f7fa); background-size:300% 300%; animation:shinyBg 3s ease infinite; border-color:#b39ddb; box-shadow:0 0 15px rgba(179,157,219,0.3); }
 .solo-word-section.transitioning .current-word { opacity:0; transform:translateY(-8px); }
@@ -916,7 +919,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
     <div class="current-word" id="soloWord"></div>
     <div class="word-hint-below" id="soloHint"></div>
     <div class="word-rule-below">从左往右依次填入</div>
-    <div class="solo-word-timer"><div class="solo-word-timer-fill" id="soloWordTimerFill"></div></div>
+    <div class="solo-word-timer"><div class="solo-word-timer-ghost" id="soloWordTimerGhost"></div><div class="solo-word-timer-fill" id="soloWordTimerFill"></div></div>
   </div>
   <div class="word-status" id="soloStatus"></div>
   <div class="solo-cards-section">
@@ -979,6 +982,11 @@ body.uppercase-mode .card { text-transform: uppercase; }
             <input type="radio" name="libSource" id="chkPrivateLib" onchange="onLibToggle()">
           </label>
           <div class="settings-lib-group" id="privateLibGroup">
+            <div class="settings-lib-label">手牌</div>
+            <div class="settings-lib-btns">
+              <button class="settings-lib-btn" disabled onclick="importLib('hand')">导入</button>
+              <button class="settings-lib-btn" disabled onclick="exportLib('hand')">导出</button>
+            </div>
             <div class="settings-lib-label">小学级</div>
             <div class="settings-lib-btns">
               <button class="settings-lib-btn" disabled onclick="importLib('easy')">导入</button>
@@ -1047,10 +1055,12 @@ body.uppercase-mode .card { text-transform: uppercase; }
 <script>
 // Banks
 let WORDS_EASY=[], WORDS_MED=[], WORDS_HARD=[];
+let HAND_POOL='abcdefghijklmnopqrstuvwxyz'.split('');
 let WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
 let wordsLoaded=false;
 fetch('words.json').then(r=>r.json()).then(data=>{
   WORDS_EASY=data.easy;WORDS_MED=data.medium;WORDS_HARD=data.hard;
+  if(data.hand&&data.hand.length>0)HAND_POOL=data.hand;
   WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
   wordsLoaded=true;
 }).catch(e=>console.error('词库加载失败',e));
@@ -1163,8 +1173,8 @@ function setupWord(winnerHand){
     const wordObj=pickWord();
     G.currentWord=wordObj;
     const letters=wordObj.en.split('');
-    const positions=[...Array(letters.length).keys()];
-    const blankPositions=shuffle(positions).slice(0,Math.min(blankCount,letters.length)).sort((a,b)=>a-b);
+    const positions=[...Array(letters.length).keys()].filter(i=>letters[i]!=='-');
+    const blankPositions=shuffle(positions).slice(0,Math.min(blankCount,positions.length)).sort((a,b)=>a-b);
     G.slots=letters.map((l,i)=>({letter:l,filled:!blankPositions.includes(i),filledBy:blankPositions.includes(i)?null:'pre'}));
     const blankLetters=blankPositions.map(i=>letters[i]);
     const hand=dealHand(blankLetters,cfg.handSize);
@@ -1185,6 +1195,7 @@ function pickWordForHand(handLetters,blankCount){
     const availH=[...handLetters];
     const matchedPositions=[];
     for(let j=0;j<letters.length;j++){
+      if(letters[j]==='-')continue;
       const hIdx=availH.indexOf(letters[j]);
       if(hIdx!==-1){
         matchedPositions.push(j);
@@ -1202,8 +1213,8 @@ function pickWordForHand(handLetters,blankCount){
   if(G.wordQueue.length===0)G.wordQueue=shuffle(getEffectiveWords()[selectedDiff]);
   const wordObj=G.wordQueue.pop();
   const letters=wordObj.en.split('');
-  const positions=[...Array(letters.length).keys()];
-  const blankPositions=shuffle(positions).slice(0,Math.min(blankCount,letters.length)).sort((a,b)=>a-b);
+  const positions=[...Array(letters.length).keys()].filter(i=>letters[i]!=='-');
+  const blankPositions=shuffle(positions).slice(0,Math.min(blankCount,positions.length)).sort((a,b)=>a-b);
   // inject blank letters into hands
   blankPositions.forEach((pos,i)=>{
     if(i<G.p1Hand.length){
@@ -1218,8 +1229,8 @@ function dealHand(neededLetters,size){
   const hand=[];
   const needed=[...neededLetters];
   for(let i=0;i<Math.min(size,needed.length);i++)hand.push(needed[i]);
-  const alpha='abcdefghijklmnopqrstuvwxyz';
-  while(hand.length<size)hand.push(alpha[Math.floor(Math.random()*26)]);
+  const alpha=getEffectiveHand();
+  while(hand.length<size)hand.push(alpha[Math.floor(Math.random()*alpha.length)]);
   return shuffle(hand);
 }
 
@@ -1346,8 +1357,8 @@ function playCard(player,idx){
   // after fly-out, replenish and draw in
   setTimeout(()=>{
     hand[idx]=null;
-    const alpha='abcdefghijklmnopqrstuvwxyz';
-    hand[idx]=alpha[Math.floor(Math.random()*26)];
+    const alpha=getEffectiveHand();
+    hand[idx]=alpha[Math.floor(Math.random()*alpha.length)];
     renderHands();
     const containerAfter=document.getElementById(isP1?'p1Hand':'p2Hand');
     const newCardEl=containerAfter.children[idx];
@@ -1785,10 +1796,33 @@ function getEffectiveWords(){
   };
 }
 
+function getEffectiveHand(){
+  const save=loadSave();
+  if(save.usePrivate){
+    const priv=save.privateLib||{};
+    if(priv.hand&&priv.hand.length>0)return priv.hand;
+  }
+  return HAND_POOL;
+}
+
 // ===== Export =====
 function exportLib(level){
   const save=loadSave();
   const priv=save.privateLib||{};
+  const names={hand:'手牌',easy:'小学级',medium:'初中级',hard:'高中级'};
+  if(level==='hand'){
+    let pool=priv.hand;
+    if(!pool||pool.length===0) pool=HAND_POOL;
+    if(pool.length===0){alert('无手牌可导出');return;}
+    const txt=pool.join(',');
+    const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='字母手牌.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return;
+  }
   let words=priv[level];
   if(!words||words.length===0) words=WORDS_MAP[level]||[];
   if(words.length===0){alert('该级别无内容可导出');return;}
@@ -1796,7 +1830,6 @@ function exportLib(level){
   const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  const names={easy:'小学级',medium:'初中级',hard:'高中级'};
   a.download=`词库_${names[level]||level}.txt`;
   a.click();
   URL.revokeObjectURL(a.href);
@@ -1813,10 +1846,18 @@ function importLib(level){
     const reader=new FileReader();
     reader.onload=()=>{
       const text=reader.result;
-      const words=parseImportText(text);
-      if(words.length===0){alert('未能解析到有效单词，请检查格式');return;}
       const save=loadSave();
       if(!save.privateLib)save.privateLib={};
+      if(level==='hand'){
+        const chars=text.split(',').map(s=>s.trim()).filter(s=>s.length===1);
+        if(chars.length===0){alert('未能解析到有效手牌字符');return;}
+        save.privateLib.hand=chars;
+        writeSave(save);
+        alert(`成功导入 ${chars.length} 个手牌字符`);
+        return;
+      }
+      const words=parseImportText(text);
+      if(words.length===0){alert('未能解析到有效单词，请检查格式');return;}
       save.privateLib[level]=words;
       writeSave(save);
       alert(`成功导入 ${words.length} 个单词到${({easy:'小学级',medium:'初中级',hard:'高中级'})[level]}`);
@@ -1834,7 +1875,7 @@ function parseImportText(text){
   for(let i=0;i<parts.length-1;i+=2){
     const en=parts[i];
     const cn=parts[i+1];
-    if(/^[a-zA-Z]+$/.test(en)){
+    if(/^[a-zA-Z]+(-[a-zA-Z]+)*$/.test(en)){
       words.push({en:en.toLowerCase(),cn:cn});
     }
   }
@@ -1895,6 +1936,10 @@ let S={
   endlessLevel:0,
   lives:2,
   timeFractional:false,
+  globalFlowRate:1,
+  wordFlowRate:1,
+  wrongCount:0,
+  wrongFlowPenalty:0,
 };
 
 function soloStage(){return SOLO_STAGES[S.stageIdx];}
@@ -1920,6 +1965,10 @@ function beginSoloGame(){
   S.endlessLevel=0;
   S.lives=2;
   S.timeFractional=false;
+  S.globalFlowRate=1;
+  S.wordFlowRate=1;
+  S.wrongCount=0;
+  S.wrongFlowPenalty=0;
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   soloUpdateStageUI();
@@ -1932,11 +1981,11 @@ function soloStartTimer(){
   clearInterval(S.timerInterval);
   S.timerInterval=setInterval(()=>{
     if(!S.running)return;
-    S.timeLeft--;
+    S.timeLeft-=0.1*S.globalFlowRate;
     if(S.timeLeft<0)S.timeLeft=0;
     document.getElementById('soloTimer').textContent=soloFormatTime();
     if(S.timeLeft<=0)soloEndGame();
-  },1000);
+  },100);
 }
 
 function soloUpdateStageUI(){
@@ -1978,18 +2027,17 @@ function soloPromoFailPenalty(idx){
 
 function soloWrongPenalty(){
   // returns {word, total} seconds deducted on wrong card
-  // stageIdx 0-8 fixed; endless (9) scales by endlessLevel
-  const WORD_TABLE=[0,0,0,0,0.1,0.1,0.1,0.1,0.2];
-  const TOTAL_TABLE=[0,0,0,0.5,0.5,0.5,0.6,0.7,0.8];
+  const WORD_TABLE=[0,0,0, 0,0.3,0.3, 0.3,0.3,0.6];
+  const TOTAL_TABLE=[0,0,0, 0.5,0.5,0.5, 1,1,1];
   if(S.stageIdx<9){
     return {word:WORD_TABLE[S.stageIdx], total:TOTAL_TABLE[S.stageIdx]};
   }
-  // endless
+  // 无尽 (idx=9): word=0.6, total=1.5
   const L=S.endlessLevel;
-  if(L<=0)return {word:0.2, total:0.9};
-  // 无尽1: word 0.2, total 1.0; each level after +0.1/+0.5
-  const word=Math.min(1, 0.2 + 0.1*(L-1));
-  const total=Math.min(5, 1.0 + 0.5*(L-1));
+  if(L<=1)return {word:0.6, total:1.5};
+  // 无尽1之后每升一段: word+0.2 cap 2, total+0.5 cap 5
+  const word=Math.min(2, 0.6 + 0.2*(L-1));
+  const total=Math.min(5, 1.5 + 0.5*(L-1));
   return {word:Math.round(word*10)/10, total:Math.round(total*10)/10};
 }
 
@@ -1999,11 +2047,22 @@ function soloFormatTime(){
 
 function soloApplyWrongPenalty(){
   const p=soloWrongPenalty();
+  // flow rate penalty: 4th wrong onwards, +0.2 global flow each
+  if(S.wrongCount>=4){
+    S.globalFlowRate+=0.2;
+    S.wrongFlowPenalty+=0.2;
+    document.getElementById('soloTimerWrap').classList.add('flow-penalty');
+  }
   // word time penalty: reduce current layer ms (cascade across layers)
   if(p.word>0){
+    // ghost bar: show pre-damage width then animate down
+    const fill=document.getElementById('soloWordTimerFill');
+    const ghost=document.getElementById('soloWordTimerGhost');
+    const preWidth=Math.max(0,S.wordTimerMs/4000*100);
+    if(ghost)ghost.style.width=preWidth+'%';
+
     let ms=p.word*1000;
     S.wordTimerMs-=ms;
-    const fill=document.getElementById('soloWordTimerFill');
     while(S.wordTimerMs<=0){
       S.wordTimerLayer--;
       S.wordTimerMs+=4000;
@@ -2013,10 +2072,13 @@ function soloApplyWrongPenalty(){
         if(S.wordTimerLayer===-1){S.combo=0;S.burstCounter=0;S.burstQualities=[];soloUpdateCombo();}
       }
     }
+    const postWidth=Math.max(0,S.wordTimerMs/4000*100);
     if(fill){
-      fill.style.width=Math.max(0,S.wordTimerMs/4000*100)+'%';
+      fill.style.width=postWidth+'%';
       fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
     }
+    // ghost shrinks to match fill after delay
+    if(ghost){setTimeout(()=>{ghost.style.width=postWidth+'%';},400);}
     soloRenderStars();
     soloUpdateStageUI();
   }
@@ -2048,12 +2110,16 @@ function soloSetupWord(promoOverride){
   const blankCount=randInt(st.blanks[0],st.blanks[1]);
   S.blankCount=blankCount;
   S.isShiny=soloRollShiny();
+  S.wrongCount=0;
+  S.globalFlowRate-=S.wrongFlowPenalty;
+  S.wrongFlowPenalty=0;
+  document.getElementById('soloTimerWrap').classList.remove('flow-penalty');
 
   const wordObj=soloPickWord(promoOverride?st.bank:null);
   S.currentWord=wordObj;
   const letters=wordObj.en.split('');
-  const positions=[...Array(letters.length).keys()];
-  const blankPositions=shuffle(positions).slice(0,Math.min(blankCount,letters.length)).sort((a,b)=>a-b);
+  const positions=[...Array(letters.length).keys()].filter(i=>letters[i]!=='-');
+  const blankPositions=shuffle(positions).slice(0,Math.min(blankCount,positions.length)).sort((a,b)=>a-b);
   S.slots=letters.map((l,i)=>({letter:l,filled:!blankPositions.includes(i),filledBy:blankPositions.includes(i)?null:'pre'}));
   const blankLetters=blankPositions.map(i=>letters[i]);
   S.hand=dealHand(blankLetters,st.hand);
@@ -2080,15 +2146,21 @@ function soloLayerColor(layer,maxLayers){
 function soloStartWordTimer(){
   clearInterval(S.wordTimer);
   const fill=document.getElementById('soloWordTimerFill');
+  const ghost=document.getElementById('soloWordTimerGhost');
   fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
   fill.style.width='100%';
+  if(ghost)ghost.style.width='100%';
   S.wordTimer=setInterval(()=>{
     if(!S.running)return;
-    S.wordTimerMs-=100;
+    S.wordTimerMs-=100*S.wordFlowRate*S.globalFlowRate;
 
     // update bar within current layer
     const ratio=Math.max(0,S.wordTimerMs/4000);
     fill.style.width=(ratio*100)+'%';
+    // ghost stays in sync during normal tick (no trailing red)
+    if(ghost && parseFloat(ghost.style.width)<=ratio*100){
+      ghost.style.width=(ratio*100)+'%';
+    }
 
     // layer boundary crossed
     if(S.wordTimerMs<=0){
@@ -2178,11 +2250,13 @@ function soloPlayCard(idx){
     const cardEl=container.children[idx];
     if(cardEl){cardEl.classList.add('shake-card');setTimeout(()=>cardEl.classList.remove('shake-card'),300);}
     playSound(200,0.08);
-    // wrong penalty: 0.5s cooldown
+    // wrong penalty: cooldown 0.5s, upgrades to 1s on 3rd+ wrong
     S.cooldown=true;
     container.classList.add('penalty');
-    setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');},500);
     // time penalties (初中级 onwards)
+    S.wrongCount++;
+    const cd=S.wrongCount>=3?1000:500;
+    setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');},cd);
     soloApplyWrongPenalty();
     return;
   }
@@ -2197,8 +2271,8 @@ function soloPlayCard(idx){
   if(flyCard)flyCard.classList.add('flying-out');
   setTimeout(()=>{
     S.hand[idx]=null;
-    const alpha='abcdefghijklmnopqrstuvwxyz';
-    S.hand[idx]=alpha[Math.floor(Math.random()*26)];
+    const alpha=getEffectiveHand();
+    S.hand[idx]=alpha[Math.floor(Math.random()*alpha.length)];
     soloRenderHand();
     const containerAfter=document.getElementById('soloHand');
     const newCard=containerAfter.children[idx];
@@ -2240,6 +2314,7 @@ function soloCheckComplete(){
   else if(rawEarned<Math.ceil(halfBase)){ quality='B'; }
   else if(rawEarned<basePts){ quality='A'; }
   else { quality='S'; }
+  if(S.wrongCount>=4) quality='C';
 
   // combo logic
   if(quality==='C'){
@@ -2278,7 +2353,7 @@ function soloCheckComplete(){
     burstPerfect=S.burstQualities.every(q=>q==='S');
     burstBonus=burstPerfect?30:20;
     S.totalScore+=burstBonus;S.stageScore+=burstBonus;
-    if(burstPerfect){S.timeLeft+=5;soloShowTimeBonus('+5 (完美爆发)');}
+    if(burstPerfect){S.timeLeft=Math.min(999,S.timeLeft+5);soloShowTimeBonus('+5 (完美爆发)');}
     soloShowBurst(burstPerfect);
     S.burstCounter=0;S.burstQualities=[];
   }
@@ -2418,7 +2493,7 @@ function soloPromote(){
   } else {
     timeBonus=[20,30,40][tier];
   }
-  if(timeBonus>0){S.timeLeft+=timeBonus;soloShowTimeBonus(`+${timeBonus} (升段)`);}
+  if(timeBonus>0){S.timeLeft=Math.min(999,S.timeLeft+timeBonus);soloShowTimeBonus(`+${timeBonus} (升段)`);}
 
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
