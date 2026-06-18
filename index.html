@@ -470,6 +470,50 @@ body {
 .mode-btn.selected { border-color: #2178d2; background: #2178d2; color: #fff; box-shadow: 0 2px 8px rgba(33,120,210,0.3); }
 .mode-btn.disabled { opacity: 0.4; cursor: not-allowed; }
 .difficulty-select { display: flex; gap: 12px; margin-bottom: 15px; }
+.solo-submode-select { display:none; gap:12px; margin-bottom:15px; align-items:center; }
+.solo-submode-btn {
+  position:relative; padding:10px 22px; border-radius:12px; border:2px solid #ddd; background:#fff;
+  color:#333; cursor:pointer; transition:all 0.2s; font-size:16px; font-weight:bold;
+}
+.solo-submode-btn:hover { border-color:#999; }
+.solo-submode-btn.selected { border-color:#2178d2; background:rgba(33,120,210,0.08); box-shadow:0 0 8px rgba(33,120,210,0.2); color:#2178d2; }
+.solo-submode-btn.locked { cursor:not-allowed; }
+.solo-submode-btn.locked:hover { border-color:#ddd; }
+.submode-label { position:relative; z-index:1; }
+.submode-lock-overlay {
+  display:none; position:absolute; inset:0; border-radius:10px;
+  background:rgba(255,255,255,0.7); z-index:2;
+  justify-content:center; align-items:center;
+}
+.solo-submode-btn.locked .submode-lock-overlay { display:flex; }
+.solo-diff-wrap { display:none; position:relative; }
+.solo-diff-trigger {
+  padding:10px 22px; border-radius:12px; border:2px solid #ddd; background:#fff;
+  color:#333; cursor:pointer; font-size:16px; font-weight:bold; transition:all 0.2s;
+}
+.solo-diff-trigger:hover { border-color:#999; }
+.solo-diff-trigger.active { border-color:#2178d2; color:#2178d2; }
+.solo-diff-popup {
+  display:none; position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+  background:#fff; border:2px solid #ddd; border-radius:12px; padding:8px;
+  flex-direction:column; gap:6px; box-shadow:0 -4px 16px rgba(0,0,0,0.1); z-index:10;
+}
+.solo-diff-popup.open { display:flex; }
+.solo-diff-option {
+  padding:8px 22px; border-radius:10px; border:none; background:#bbb; color:#fff;
+  cursor:pointer; font-size:14px; font-weight:bold; transition:all 0.2s; white-space:nowrap;
+}
+.solo-diff-option.unlocked { background:#6b7b8d; }
+.solo-diff-option.unlocked:hover { background:#4a6178; }
+.solo-diff-option.selected { background:#2178d2; }
+.solo-diff-option.locked { opacity:0.5; cursor:not-allowed; }
+.solo-toast {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:rgba(0,0,0,0.75); color:#fff; padding:12px 24px; border-radius:10px;
+  font-size:14px; font-weight:bold; z-index:999; pointer-events:none;
+  animation:toastFade 1.5s forwards;
+}
+@keyframes toastFade { 0%,70%{opacity:1;} 100%{opacity:0;} }
 .diff-btn {
   padding: 10px 22px;
   border-radius: 12px;
@@ -770,7 +814,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-life-bar { display:inline-flex; align-items:center; gap:8px; padding:5px 10px; border:2px solid #4caf50; border-radius:10px; }
 .solo-life-dot { width:14px; height:14px; border-radius:50%; background:#4caf50; transition:background 0.3s; }
 .solo-life-dot.lost { background:#bdbdbd; }
-.solo-stars { font-size:18px; letter-spacing:2px; color:#d4a800; }
+.solo-stars { font-size:18px; letter-spacing:2px; color:#d4a800; font-weight:bold; }
 .xp-star { position:fixed; left:0; top:0; width:18px; height:18px; margin:-9px 0 0 -9px; pointer-events:none; z-index:200; will-change:left,top,transform; filter:drop-shadow(0 0 2px rgba(0,0,0,0.25)); }
 .xp-star svg { width:100%; height:100%; display:block; }
 .solo-score-box.score-bump { animation:scoreBump 0.18s ease; }
@@ -940,6 +984,23 @@ body.uppercase-mode .card { text-transform: uppercase; }
     <div class="mode-btn" id="modeSolo" onclick="selectMode('solo')">单人爬塔</div>
     <div class="mode-btn selected" id="modeLocal" onclick="selectMode('local')">本地对抗</div>
   </div>
+  <div class="solo-submode-select" id="soloSubmodeSelect">
+    <div class="solo-diff-wrap" id="soloDiffWrap">
+      <div class="solo-diff-trigger" id="soloDiffTrigger" onclick="toggleSoloDiffPopup()">难&nbsp;&nbsp;度</div>
+      <div class="solo-diff-popup" id="soloDiffPopup">
+        <div class="solo-diff-option" data-tier="hard" onclick="selectSoloTier('hard')">高中级</div>
+        <div class="solo-diff-option" data-tier="medium" onclick="selectSoloTier('medium')">初中级</div>
+        <div class="solo-diff-option" data-tier="easy" onclick="selectSoloTier('easy')">小学级</div>
+      </div>
+    </div>
+    <div class="solo-submode-btn selected" id="submodeStudy" onclick="selectSubmode('study')">学习屋</div>
+    <div class="solo-submode-btn" id="submodeDungeon" onclick="selectSubmode('dungeon')">
+      <span class="submode-label">地下城</span>
+      <div class="submode-lock-overlay" id="dungeonLock">
+        <svg viewBox="0 0 24 28" width="28" height="32"><path d="M7 12V8a5 5 0 0 1 10 0v4" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round"/><rect x="4" y="12" width="16" height="13" rx="3" fill="#ccc"/></svg>
+      </div>
+    </div>
+  </div>
   <div class="difficulty-select" id="diffSelect">
     <div class="diff-btn selected" data-diff="easy" onclick="selectDiff('easy')">小学级</div>
     <div class="diff-btn" data-diff="medium" onclick="selectDiff('medium')">初中级</div>
@@ -1076,10 +1137,22 @@ const DIFF_CONFIG={
 };
 
 let selectedMode='local';
+let selectedSubmode='study';
+let soloLockedTier=null; // null=no lock, 'easy'/'medium'/'hard'
+
 function toggleCase(){
   const btn=document.getElementById('caseToggle');
   btn.classList.toggle('uppercase');
   document.body.classList.toggle('uppercase-mode');
+}
+
+function getLocalHighestStage(){
+  const save=loadSave();
+  return save.highestStage||0;
+}
+function saveLocalHighestStage(stage){
+  const save=loadSave();
+  if(stage>(save.highestStage||0)){save.highestStage=stage;writeSave(save);}
 }
 
 function selectMode(mode){
@@ -1089,6 +1162,9 @@ function selectMode(mode){
   // solo hides difficulty select (always starts from easy-1); local shows it
   document.getElementById('diffSelect').style.display=mode==='solo'?'none':'flex';
   document.getElementById('controlsHint').style.display=mode==='solo'?'none':'block';
+  document.getElementById('soloSubmodeSelect').style.display=mode==='solo'?'flex':'none';
+  document.getElementById('soloDiffWrap').style.display=(mode==='solo'&&selectedSubmode==='study')?'block':'none';
+  document.getElementById('soloDiffPopup').classList.remove('open');
   // swap rules content by mode
   const rb=document.getElementById('rulesBody');
   if(mode==='solo'){
@@ -1101,6 +1177,76 @@ function selectMode(mode){
       <p><b>做题规范：从左往右填写！</b></p>
       <p>左侧玩家使用键盘 <b>1 2 3 4 5</b> 使用手牌，<b>~</b> 可以放弃</p>
       <p>右侧玩家使用数字键盘 <b>1 2 3 4 5</b> 或鼠标点击使用手牌，<b>-</b> 可以放弃</p>`;
+  }
+}
+
+// Solo sub-mode (学习屋/地下城)
+function selectSubmode(sub){
+  if(sub==='dungeon'){
+    const highest=getLocalHighestStage();
+    if(highest<9){showToast('到达【无尽】后解锁');return;}
+  }
+  selectedSubmode=sub;
+  document.querySelectorAll('.solo-submode-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById(sub==='study'?'submodeStudy':'submodeDungeon').classList.add('selected');
+  document.getElementById('soloDiffWrap').style.display=sub==='study'?'block':'none';
+  updateSoloDiffOptions();
+}
+
+// Difficulty lock popup
+function toggleSoloDiffPopup(){
+  const popup=document.getElementById('soloDiffPopup');
+  popup.classList.toggle('open');
+  if(popup.classList.contains('open'))updateSoloDiffOptions();
+}
+function updateSoloDiffOptions(){
+  const highest=getLocalHighestStage();
+  // 小学级: need >=3 (初中1星), 初中级: need >=6 (高中1星), 高中级: need >=9 (无尽)
+  const reqs={easy:3,medium:6,hard:9};
+  const names={easy:'小学级',medium:'初中级',hard:'高中级'};
+  document.querySelectorAll('.solo-diff-option').forEach(opt=>{
+    const tier=opt.dataset.tier;
+    const unlocked=highest>=reqs[tier];
+    opt.classList.toggle('unlocked',unlocked&&soloLockedTier!==tier);
+    opt.classList.toggle('locked',!unlocked);
+    opt.classList.toggle('selected',soloLockedTier===tier);
+  });
+}
+function selectSoloTier(tier){
+  const highest=getLocalHighestStage();
+  const reqs={easy:3,medium:6,hard:9};
+  if(highest<reqs[tier]){showToast('未通过该段位最高层');return;}
+  if(soloLockedTier===tier){soloLockedTier=null;}
+  else{soloLockedTier=tier;}
+  const names={easy:'小学级',medium:'初中级',hard:'高中级'};
+  const trigger=document.getElementById('soloDiffTrigger');
+  trigger.textContent=soloLockedTier?names[soloLockedTier]:'难\u00a0\u00a0度';
+  trigger.classList.toggle('active',!!soloLockedTier);
+  document.getElementById('soloDiffPopup').classList.remove('open');
+  updateSoloDiffOptions();
+}
+
+// Toast
+let _toastTimer=null;
+function showToast(msg){
+  let el=document.querySelector('.solo-toast');
+  if(el)el.remove();
+  clearTimeout(_toastTimer);
+  el=document.createElement('div');
+  el.className='solo-toast';
+  el.textContent=msg;
+  document.body.appendChild(el);
+  _toastTimer=setTimeout(()=>{el.remove();},1500);
+}
+
+// Init dungeon lock state on page load
+function initSoloSubmodeUI(){
+  const highest=getLocalHighestStage();
+  const dungeonBtn=document.getElementById('submodeDungeon');
+  if(highest<9){
+    dungeonBtn.classList.add('locked');
+  } else {
+    dungeonBtn.classList.remove('locked');
   }
 }
 
@@ -1883,7 +2029,12 @@ function parseImportText(text){
 }
 
 // init on page load
-document.addEventListener('DOMContentLoaded',initSettingsFromSave);
+document.addEventListener('DOMContentLoaded',()=>{initSettingsFromSave();initSoloSubmodeUI();});
+document.addEventListener('click',e=>{
+  const popup=document.getElementById('soloDiffPopup');
+  const trigger=document.getElementById('soloDiffTrigger');
+  if(popup&&trigger&&!popup.contains(e.target)&&!trigger.contains(e.target)){popup.classList.remove('open');}
+});
 
 // Disable right-click menu; use right-click as pause/back
 document.addEventListener('contextmenu',e=>{
@@ -1949,7 +2100,11 @@ let S={
   wrongFlowPenalty:0,
 };
 
-function soloStage(){return SOLO_STAGES[S.stageIdx];}
+function soloStage(){
+  const base=SOLO_STAGES[S.stageIdx];
+  if(!S.tierLock)return base;
+  return Object.assign({},base,{bank:S.tierLock});
+}
 function soloStageStars(){
   const tier=Math.floor(S.stageIdx/3); // 0=小学,1=初中,2=高中,3=无尽
   const star=S.stageIdx%3;
@@ -1976,6 +2131,14 @@ function beginSoloGame(){
   S.wordFlowRate=1;
   S.wrongCount=0;
   S.wrongFlowPenalty=0;
+  S.tierLock=soloLockedTier; // lock tier for this session
+
+  // apply tier lock: start at lowest stage of that tier
+  if(S.tierLock){
+    const tierStartIdx={easy:0,medium:3,hard:6};
+    S.stageIdx=tierStartIdx[S.tierLock]||0;
+    S.maxStageReached=S.stageIdx;
+  }
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   soloUpdateStageUI();
@@ -1997,11 +2160,24 @@ function soloStartTimer(){
 
 function soloUpdateStageUI(){
   const st=soloStage();
-  let label=st.label.replace(/\s*\d+星$/,'');
-  if(S.stageIdx>=9 && S.endlessLevel>0)label+=' '+S.endlessLevel;
+  const tierNames={easy:'小学级',medium:'初中级',hard:'高中级'};
+  let label, subText;
+  if(S.tierLock){
+    label=tierNames[S.tierLock];
+    const tierStart={easy:0,medium:3,hard:6}[S.tierLock];
+    const lvl=S.stageIdx-tierStart+1;
+    subText=lvl>0?'Lv.'+lvl:'';
+    if(S.stageIdx>=9){
+      subText='Lv.'+(4+S.endlessLevel);
+    }
+  } else {
+    label=st.label.replace(/\s*\d+星$/,'');
+    if(S.stageIdx>=9 && S.endlessLevel>0)label+=' '+S.endlessLevel;
+    const subM=st.label.match(/(\d+)星/);
+    subText=subM?'★'.repeat(parseInt(subM[1])):'';
+  }
   document.getElementById('soloStageTag').textContent=label;
-  const subM=st.label.match(/(\d+)星/);
-  document.getElementById('soloStars').textContent=subM?'★'.repeat(parseInt(subM[1])):'';
+  document.getElementById('soloStars').textContent=subText;
   document.getElementById('soloScoreBox').textContent=S.totalScore;
   const promoFill=document.getElementById('soloPromoFill');
   if(promoFill){
@@ -2488,6 +2664,7 @@ function soloPromote(){
   const tier=soloStageTier(S.stageIdx);
   S.stageIdx=Math.min(S.stageIdx+1,9);
   S.maxStageReached=Math.max(S.maxStageReached,S.stageIdx);
+  saveLocalHighestStage(S.maxStageReached);
   S.stageScore=0;S.correctCount=0;S.streakCount=0;S.promoReady=false;
 
   // time bonus by tier
@@ -2506,8 +2683,17 @@ function soloPromote(){
   // flash effect
   const flash=document.createElement('div');
   flash.className='solo-promote-flash';
-  let promoLabel=soloStage().label.replace(/\s*\d+星$/,'');
-  if(S.stageIdx>=9 && S.endlessLevel>0)promoLabel+=' '+S.endlessLevel;
+  let promoLabel;
+  if(S.tierLock){
+    const tierNames={easy:'小学级',medium:'初中级',hard:'高中级'};
+    const tierStart={easy:0,medium:3,hard:6}[S.tierLock];
+    let lvl=S.stageIdx-tierStart+1;
+    if(S.stageIdx>=9)lvl=4+S.endlessLevel;
+    promoLabel=tierNames[S.tierLock]+' Lv.'+lvl;
+  } else {
+    promoLabel=soloStage().label.replace(/\s*\d+星$/,'');
+    if(S.stageIdx>=9 && S.endlessLevel>0)promoLabel+=' '+S.endlessLevel;
+  }
   flash.innerHTML=`<div class="promote-text">升段! ${promoLabel}</div>`;
   document.body.appendChild(flash);
   playSound(523,0.2);setTimeout(()=>playSound(659,0.2),150);setTimeout(()=>playSound(784,0.3),300);
@@ -2560,14 +2746,25 @@ function soloPromoFail(){
 
 function soloDemote(){
   clearInterval(S.wordTimer);
-  S.stageIdx=Math.max(0,S.stageIdx-1);
+  const minIdx=S.tierLock?({easy:0,medium:3,hard:6}[S.tierLock]):0;
+  S.stageIdx=Math.max(minIdx,S.stageIdx-1);
   S.stageScore=0;S.correctCount=0;S.streakCount=0;S.promoReady=false;S.isPromoQuestion=false;
   S.lives--;
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   const flash=document.createElement('div');
   flash.className='solo-demote-flash';
-  flash.innerHTML=`<div class="promote-text">掉段... ${soloStage().label}</div>`;
+  let demoteLabel;
+  if(S.tierLock){
+    const tierNames={easy:'小学级',medium:'初中级',hard:'高中级'};
+    const tierStart={easy:0,medium:3,hard:6}[S.tierLock];
+    let lvl=S.stageIdx-tierStart+1;
+    if(lvl<1)lvl=1;
+    demoteLabel=tierNames[S.tierLock]+' Lv.'+lvl;
+  } else {
+    demoteLabel=soloStage().label;
+  }
+  flash.innerHTML=`<div class="promote-text">掉段... ${demoteLabel}</div>`;
   document.body.appendChild(flash);
   playSound(200,0.3);
   setTimeout(()=>{flash.remove();},1200);
@@ -2625,6 +2822,7 @@ function soloAddWordBook(){
 
 function soloEndGame(){
   S.running=false;clearInterval(S.timerInterval);clearInterval(S.wordTimer);
+  saveLocalHighestStage(S.maxStageReached);
   const maxReached=S.maxStageReached;
   const tierLabels=['小学级','初中级','高中级','无尽'];
 
