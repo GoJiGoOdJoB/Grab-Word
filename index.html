@@ -1909,11 +1909,17 @@ function onLibToggle(){
 
 // ===== localStorage =====
 const STORAGE_KEY='grabword_save';
+const APP_VERSION='a00001';
 function loadSave(){
   try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch(e){return {};}
 }
 function writeSave(data){
   localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+}
+function syncVersion(){
+  const save=loadSave();
+  save.version=APP_VERSION;
+  writeSave(save);
 }
 function saveSettings(){
   const save=loadSave();
@@ -2029,7 +2035,7 @@ function parseImportText(text){
 }
 
 // init on page load
-document.addEventListener('DOMContentLoaded',()=>{initSettingsFromSave();initSoloSubmodeUI();});
+document.addEventListener('DOMContentLoaded',()=>{syncVersion();initSettingsFromSave();initSoloSubmodeUI();});
 document.addEventListener('click',e=>{
   const popup=document.getElementById('soloDiffPopup');
   const trigger=document.getElementById('soloDiffTrigger');
