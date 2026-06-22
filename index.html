@@ -839,7 +839,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-cards-section { width:100%; max-width:600px; display:flex; flex-direction:column; align-items:center; gap:4px; }
 .solo-cards-section .card { background:#fff; border:2px solid #2178d2; color:#2178d2; }
 .solo-book-section { width:100%; max-width:600px; display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border:1px solid #e0e0e0; border-radius:8px; background:#fff; min-height:38px; flex:1; overflow:hidden; min-height:0; }
-.solo-book-section .wordbook-item { background:rgba(33,120,210,0.08); color:#2178d2; }
+.solo-book-section .wordbook-item { }
 .solo-combo-box { position:absolute; top:12px; right:20px; font-size:36px; font-weight:900; color:#e53935; z-index:5; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
 .solo-combo-box.animating { animation:comboFlash 0.4s ease; }
 .solo-pause-btn { padding:5px 10px; background:#fff; border:2px solid #ccc; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
@@ -2567,7 +2567,7 @@ function soloCheckComplete(){
   statusEl.innerHTML=lines.join('<br>');
   soloUpdateCombo();
   soloUpdateStageUI();
-  soloAddWordBook();
+  soloAddWordBook(quality);
   soloFlyStars(rawEarned, S.isShiny, comboBonus+burstBonus);
 
   // check promotion conditions (not during promo question)
@@ -2829,10 +2829,15 @@ function soloUpdateCombo(){
   if(S.combo>1){el.classList.remove('animating');void el.offsetWidth;el.classList.add('animating');}
 }
 
-function soloAddWordBook(){
+function soloAddWordBook(quality){
   const book=document.getElementById('soloBook');
   const item=document.createElement('span');item.className='wordbook-item';
+  const colors={S:'#2178d2',A:'#4caf50',B:'#f9a825',C:'#e53935'};
+  const bgs={S:'rgba(33,120,210,0.08)',A:'rgba(76,175,80,0.08)',B:'rgba(249,168,37,0.08)',C:'rgba(229,57,53,0.08)'};
+  item.style.color=colors[quality]||'#2178d2';
+  item.style.background=bgs[quality]||bgs.S;
   item.innerHTML=`${S.currentWord.en}<br><span class="wb-cn">${S.currentWord.cn}</span>`;
+  item.dataset.quality=quality||'S';
   book.appendChild(item);
   book.scrollTop=book.scrollHeight;
 }
@@ -2913,8 +2918,8 @@ function soloEndGame(){
 
   // button — higher up
   const btnWrap=document.createElement('div');
-  btnWrap.style.cssText='position:absolute;bottom:120px;left:0;right:0;display:flex;justify-content:center;opacity:0;transition:opacity 0.5s;z-index:210;';
-  btnWrap.innerHTML='<button class="btn btn-start" onclick="location.reload()" style="padding:14px 40px;font-size:18px;">再来一把</button>';
+  btnWrap.style.cssText='position:absolute;bottom:120px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:12px;opacity:0;transition:opacity 0.5s;z-index:210;';
+  btnWrap.innerHTML=`<button class="btn" style="padding:10px 32px;font-size:16px;background:#fff;color:#333;border:2px solid #ddd;" id="endBookBtn">本局收获的单词</button><button class="btn btn-start" onclick="location.reload()" style="padding:14px 40px;font-size:18px;">再来一把</button>`;
   ov.appendChild(btnWrap);
 
   document.body.appendChild(ov);
@@ -2940,8 +2945,25 @@ function soloEndGame(){
       header.style.pointerEvents='auto';
       btnWrap.style.opacity='1';
       playSound(523,0.2);setTimeout(()=>playSound(659,0.2),150);setTimeout(()=>playSound(784,0.3),300);
+      document.getElementById('endBookBtn').onclick=()=>soloShowEndWordbook(ov);
     },(duration+0.3)*1000);
   });
+}
+
+function soloShowEndWordbook(parentOv){
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  const box=document.createElement('div');
+  box.style.cssText='width:min(420px,88vw);max-height:65vh;overflow-y:auto;background:#fff;border-radius:14px;padding:18px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px;';
+  const book=document.getElementById('soloBook');
+  box.innerHTML=book.innerHTML;
+  modal.appendChild(box);
+  const closeBtn=document.createElement('button');
+  closeBtn.textContent='继续加油';
+  closeBtn.style.cssText='margin-top:16px;padding:10px 32px;font-size:16px;font-weight:bold;background:#fff;border:2px solid #ddd;border-radius:20px;color:#333;cursor:pointer;';
+  closeBtn.onclick=()=>modal.remove();
+  modal.appendChild(closeBtn);
+  parentOv.appendChild(modal);
 }
 
 function soloPauseGame(){
