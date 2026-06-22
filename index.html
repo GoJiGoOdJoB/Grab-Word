@@ -831,7 +831,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-score-box { font-size:32px; font-weight:900; color:#2178d2; position:relative; }
 .solo-word-timer { position:absolute; left:clamp(12px,4vw,30px); right:clamp(12px,4vw,30px); bottom:10px; width:auto; max-width:none; height:8px; border-radius:4px; background:#eee; overflow:hidden; }
 .solo-word-timer-fill { position:absolute; left:0; top:0; height:100%; width:100%; background:#4caf50; transition:width 0.1s linear, background-color 0.3s; z-index:2; }
-.solo-word-timer-ghost { position:absolute; left:0; top:0; height:100%; width:0; background:#555; z-index:1; transition:width 0.3s ease-out; }
+.solo-word-timer-ghost { position:absolute; left:0; top:0; height:100%; width:0; background:#555; z-index:1; }
 .solo-word-section { flex:1; width:auto; min-width:0; max-width:92vw; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; border:1px solid #e0e0e0; border-radius:14px; background:rgba(255,255,255,0.7); max-height:40%; position:relative; padding:15px clamp(12px,4vw,30px) 26px; overflow:hidden; }
 .solo-word-section.shiny { background:linear-gradient(135deg,#e0f7fa,#fff,#e8daef,#d1c4e9,#e0f7fa); background-size:300% 300%; animation:shinyBg 3s ease infinite; border-color:#b39ddb; box-shadow:0 0 15px rgba(179,157,219,0.3); }
 .solo-word-section.transitioning .current-word { opacity:0; transform:translateY(-8px); }
@@ -2246,8 +2246,8 @@ function soloApplyWrongPenalty(){
   if(p.word>0){
     const fill=document.getElementById('soloWordTimerFill');
     const ghost=document.getElementById('soloWordTimerGhost');
-    // ghost: show at pre-damage width, then shrink + fade
     const preWidth=Math.max(0,S.wordTimerMs/4000*100);
+    const preLayer=S.wordTimerLayer;
 
     let ms=p.word*1000;
     S.wordTimerMs-=ms;
@@ -2266,12 +2266,20 @@ function soloApplyWrongPenalty(){
       fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
     }
     if(ghost){
-      ghost.style.transition='none';
-      ghost.style.width=preWidth+'%';
-      requestAnimationFrame(()=>{
-        ghost.style.transition='width 0.3s ease-out';
-        ghost.style.width=postWidth+'%';
-      });
+      const crossed=preLayer!==S.wordTimerLayer;
+      if(crossed){
+        ghost.style.transition='none';ghost.style.width='0';ghost.style.opacity='1';
+      }else{
+        ghost.style.transition='none';
+        ghost.style.width=preWidth+'%';
+        ghost.style.opacity='1';
+        requestAnimationFrame(()=>{
+          ghost.style.transition='opacity 0.3s ease-out';
+          ghost.style.opacity='0';
+        });
+        clearTimeout(ghost._ghostTimer);
+        ghost._ghostTimer=setTimeout(()=>{ghost.style.transition='none';ghost.style.width='0';ghost.style.opacity='1';},320);
+      }
     }
     soloRenderStars();
     soloUpdateStageUI();
@@ -2357,6 +2365,9 @@ function soloStartWordTimer(){
       fill.style.width='100%';
       fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
       soloRenderStars();
+      // reset ghost on layer drop
+      const g=document.getElementById('soloWordTimerGhost');
+      if(g){clearTimeout(g._ghostTimer);g.style.transition='none';g.style.width='0';g.style.opacity='1';}
 
       // negative layer: deduct 1 from total score + break all combos
       if(S.wordTimerLayer<0){
