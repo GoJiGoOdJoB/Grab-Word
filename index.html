@@ -906,7 +906,11 @@ body.uppercase-mode .card { text-transform: uppercase; }
   .book-section, .solo-book-section { min-height: 30px; padding: 4px 6px; }
 }
 </style>
-<script>document.addEventListener('touchend',function(e){if(e.target&&e.target.blur)e.target.blur();},true);</script>
+<script>
+document.addEventListener('touchstart',function(){},true);
+document.addEventListener('touchend',function(e){if(e.target&&e.target.blur&&e.target.tagName!=='INPUT')e.target.blur();},true);
+document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')e.preventDefault();},false);
+</script>
 </head>
 <body>
 
