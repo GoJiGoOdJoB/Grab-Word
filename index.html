@@ -736,9 +736,13 @@ body.uppercase-mode .card { text-transform: uppercase; }
   transition:transform 0.15s;
 }
 .score-card:hover { transform:scale(1.02); }
-.sc-name { position:absolute; top:4px; left:10px; right:60px; font-size:clamp(20px,6vw,28px); font-weight:900; color:rgba(33,120,210,0.12); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
-.sc-date { position:absolute; top:4px; right:10px; font-size:11px; color:#e67e22; font-weight:bold; }
-.sc-stage { font-size:clamp(16px,4.5vw,22px); font-weight:900; color:#333; }
+.sc-name { position:absolute; top:2px; left:10px; right:60px; font-size:clamp(18px,5vw,24px); font-weight:900; color:rgba(33,120,210,0.12); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.sc-date { position:absolute; top:2px; right:10px; font-size:11px; color:#e67e22; font-weight:bold; }
+.sc-stage { font-size:clamp(16px,4.5vw,22px); font-weight:900; color:#333; margin-top:2px; }
+.sc-stats { display:flex; align-items:center; gap:10px; font-size:11px; color:#666; font-weight:bold; margin-top:2px; }
+.sc-stats .sc-stat { display:flex; align-items:center; gap:3px; }
+.sc-stats .sc-icon-sq { width:10px; height:10px; background:#2178d2; border-radius:2px; }
+.sc-stats .sc-icon-circle { width:10px; height:10px; background:#f5a623; border-radius:50%; }
 .sc-score { position:absolute; right:14px; bottom:10px; font-size:clamp(20px,6vw,30px); font-weight:900; color:#36549e; }
 .sc-ver { position:absolute; right:10px; bottom:2px; font-size:9px; color:rgba(0,0,0,0.15); }
 
@@ -2107,10 +2111,13 @@ function renderScoreCard(){
   const top=sorted[0];
   const stage=getStageLabel(top);
   const date=top.date||'';
+  const tc=top.totalCorrect!=null?top.totalCorrect:'-';
+  const pc=top.perfectCount!=null?top.perfectCount:'-';
   card.innerHTML=`<div class="score-card" onclick="openLeaderboard()">
     <span class="sc-name">${top.name||'???'}</span>
     <span class="sc-date">${date}</span>
     <span class="sc-stage">${stage}</span>
+    <div class="sc-stats"><span class="sc-stat"><span class="sc-icon-sq"></span>${tc}</span><span class="sc-stat"><span class="sc-icon-circle"></span>${pc}</span></div>
     <span class="sc-score">${top.score} <span style="font-size:0.6em">P</span></span>
     <span class="sc-ver">${top.version||''}</span>
   </div>`;
@@ -2127,7 +2134,9 @@ function openLeaderboard(){
     const stage=getStageLabel(r);
     const el=document.createElement('div');
     el.className='score-card';
-    el.innerHTML=`<span class="sc-name">${r.name||'???'}</span><span class="sc-date">${r.date||''}</span><span class="sc-stage">${stage}</span><span class="sc-score">${r.score} <span style="font-size:0.6em">P</span></span><span class="sc-ver">${r.version||''}</span>`;
+    const rtc=r.totalCorrect!=null?r.totalCorrect:'-';
+    const rpc=r.perfectCount!=null?r.perfectCount:'-';
+    el.innerHTML=`<span class="sc-name">${r.name||'???'}</span><span class="sc-date">${r.date||''}</span><span class="sc-stage">${stage}</span><div class="sc-stats"><span class="sc-stat"><span class="sc-icon-sq"></span>${rtc}</span><span class="sc-stat"><span class="sc-icon-circle"></span>${rpc}</span></div><span class="sc-score">${r.score} <span style="font-size:0.6em">P</span></span><span class="sc-ver">${r.version||''}</span>`;
     box.appendChild(el);
   });
   modal.appendChild(box);
@@ -3183,7 +3192,9 @@ function soloEndGame(){
           tierLock:S.tierLock||null,
           level:S.tierLock?(S.maxStageReached>=9?(4+S.endlessLevel):((S.maxStageReached-({easy:0,medium:3,hard:6}[S.tierLock]||0))+1)):0,
           submode:selectedSubmode,
-          version:APP_VERSION
+          version:APP_VERSION,
+          totalCorrect:S.totalCorrect,
+          perfectCount:S.perfectCount
         };
         addScoreRecord(record);
         const btn=document.getElementById('endRecordBtn');
