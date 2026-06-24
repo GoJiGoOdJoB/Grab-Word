@@ -692,6 +692,20 @@ body {
   transition: all 0.2s;
 }
 .settings-lib-btn:hover { background: #2a5fa8; }
+.settings-lib-del {
+  padding: 6px 10px; border: none; border-radius: 8px; background: #e53935; color: #fff;
+  font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; line-height: 1;
+}
+.settings-lib-del:hover { background: #c62828; }
+.settings-cache-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid #eee; font-size: 15px;
+}
+.settings-del-btn {
+  padding: 6px 16px; border: none; border-radius: 8px; background: #e53935; color: #fff;
+  font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;
+}
+.settings-del-btn:hover { background: #c62828; }
 .settings-lib-btn:disabled {
   background: #ccc;
   color: #888;
@@ -1063,7 +1077,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
     <div class="settings-body">
       <div class="settings-sidebar">
         <div class="settings-tab active" data-tab="wordlib" onclick="switchSettingsTab('wordlib')">词库</div>
-        <div class="settings-tab" data-tab="cache" onclick="switchSettingsTab('cache')">缓存</div>
+        <div class="settings-tab" data-tab="cache" onclick="switchSettingsTab('cache')">存档</div>
         <button class="settings-save" onclick="saveSettings()">保存</button>
       </div>
       <div class="settings-content">
@@ -1081,25 +1095,37 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
             <div class="settings-lib-btns">
               <button class="settings-lib-btn" disabled onclick="importLib('hand')">导入</button>
               <button class="settings-lib-btn" disabled onclick="exportLib('hand')">导出</button>
+              <button class="settings-lib-del" data-lib="hand" onclick="confirmDelete('lib-hand')" style="display:none">✕</button>
             </div>
             <div class="settings-lib-label">小学级</div>
             <div class="settings-lib-btns">
               <button class="settings-lib-btn" disabled onclick="importLib('easy')">导入</button>
               <button class="settings-lib-btn" disabled onclick="exportLib('easy')">导出</button>
+              <button class="settings-lib-del" data-lib="easy" onclick="confirmDelete('lib-easy')" style="display:none">✕</button>
             </div>
             <div class="settings-lib-label">初中级</div>
             <div class="settings-lib-btns">
               <button class="settings-lib-btn" disabled onclick="importLib('medium')">导入</button>
               <button class="settings-lib-btn" disabled onclick="exportLib('medium')">导出</button>
+              <button class="settings-lib-del" data-lib="medium" onclick="confirmDelete('lib-medium')" style="display:none">✕</button>
             </div>
             <div class="settings-lib-label">高中级</div>
             <div class="settings-lib-btns">
               <button class="settings-lib-btn" disabled onclick="importLib('hard')">导入</button>
               <button class="settings-lib-btn" disabled onclick="exportLib('hard')">导出</button>
+              <button class="settings-lib-del" data-lib="hard" onclick="confirmDelete('lib-hard')" style="display:none">✕</button>
             </div>
           </div>
         </div>
         <div class="settings-page" id="settingsPageCache">
+          <div class="settings-cache-row">
+            <span>所有内容</span>
+            <button class="settings-del-btn" onclick="confirmDelete('all')">删除</button>
+          </div>
+          <div class="settings-cache-row">
+            <span>分数记录</span>
+            <button class="settings-del-btn" onclick="confirmDelete('records')">删除</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1930,7 +1956,7 @@ function pvpFlyStars(player, rawEarned, isShiny, extraPts){
 
 function showRules(){document.getElementById('rulesOverlay').classList.remove('hidden');}
 function hideRules(){document.getElementById('rulesOverlay').classList.add('hidden');}
-function openSettings(){document.getElementById('settingsOverlay').classList.remove('hidden');}
+function openSettings(){document.getElementById('settingsOverlay').classList.remove('hidden');updateLibDelButtons();}
 function closeSettings(){document.getElementById('settingsOverlay').classList.add('hidden');}
 function switchSettingsTab(tab){
   document.querySelectorAll('.settings-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
@@ -1940,6 +1966,55 @@ function switchSettingsTab(tab){
 function onLibToggle(){
   const priv=document.getElementById('chkPrivateLib').checked;
   document.querySelectorAll('#privateLibGroup .settings-lib-btn').forEach(b=>b.disabled=!priv);
+  updateLibDelButtons();
+}
+function updateLibDelButtons(){
+  const save=loadSave();
+  const priv=save.privateLib||{};
+  ['hand','easy','medium','hard'].forEach(key=>{
+    const btn=document.querySelector(`.settings-lib-del[data-lib="${key}"]`);
+    if(!btn)return;
+    const has=key==='hand'?(priv.hand&&priv.hand.length>0):(priv[key]&&priv[key].length>0);
+    btn.style.display=has?'':'none';
+  });
+}
+function confirmDelete(target){
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:600;display:flex;align-items:center;justify-content:center;';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;padding:24px 28px;text-align:center;min-width:240px;';
+  box.innerHTML=`<div style="font-size:16px;font-weight:bold;margin-bottom:18px;">删除后无法复原</div>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button style="padding:8px 22px;border:none;border-radius:8px;background:#e53935;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;" id="confirmDelYes">确认</button>
+      <button style="padding:8px 22px;border:none;border-radius:8px;background:#2178d2;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;" id="confirmDelNo">取消</button>
+    </div>`;
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+  document.getElementById('confirmDelNo').onclick=()=>modal.remove();
+  document.getElementById('confirmDelYes').onclick=()=>{
+    modal.remove();
+    executeDelete(target);
+  };
+}
+function executeDelete(target){
+  if(target==='all'){
+    localStorage.removeItem(STORAGE_KEY);
+    renderScoreCard();
+    showToast('已清除所有存档');
+  } else if(target==='records'){
+    const save=loadSave();
+    delete save.records;
+    writeSave(save);
+    renderScoreCard();
+    showToast('已清除分数记录');
+  } else if(target.startsWith('lib-')){
+    const key=target.replace('lib-','');
+    const save=loadSave();
+    if(save.privateLib)delete save.privateLib[key];
+    writeSave(save);
+    updateLibDelButtons();
+    showToast('已删除词库');
+  }
 }
 
 // ===== localStorage =====
@@ -2194,16 +2269,16 @@ document.addEventListener('contextmenu',e=>{
 // ============ SOLO TOWER MODE ============
 const SOLO_STAGES=[
   // [stageIndex, label, wordBank, blanks, handSize, shinyC, promoteScore]
-  {label:'小学 1星',bank:'easy',blanks:[1,1],hand:3,shinyC:0,   promoScore:20},
-  {label:'小学 2星',bank:'easy',blanks:[1,2],hand:3,shinyC:0.05, promoScore:20},
-  {label:'小学 3星',bank:'easy',blanks:[2,2],hand:3,shinyC:0.10, promoScore:20},
-  {label:'初中 1星',bank:'medium',blanks:[2,2],hand:4,shinyC:0.10,promoScore:30},
-  {label:'初中 2星',bank:'medium',blanks:[2,3],hand:4,shinyC:0.15,promoScore:30},
-  {label:'初中 3星',bank:'medium',blanks:[3,3],hand:4,shinyC:0.20,promoScore:30},
-  {label:'高中 1星',bank:'hard',blanks:[3,3],hand:5,shinyC:0.20,promoScore:40},
-  {label:'高中 2星',bank:'hard',blanks:[4,4],hand:5,shinyC:0.25,promoScore:40},
-  {label:'高中 3星',bank:'hard',blanks:[5,5],hand:6,shinyC:0.30,promoScore:40},
-  {label:'无尽',bank:'hard',blanks:[5,5],hand:6,shinyC:0.30,promoScore:40},
+  {label:'小学 1星',bank:'easy',blanks:[1,1],hand:3,shinyC:0,    promoScore:20},
+  {label:'小学 2星',bank:'easy',blanks:[1,2],hand:3,shinyC:0,    promoScore:20},
+  {label:'小学 3星',bank:'easy',blanks:[2,2],hand:3,shinyC:0.01, promoScore:20},
+  {label:'初中 1星',bank:'medium',blanks:[2,2],hand:4,shinyC:0.03,promoScore:30},
+  {label:'初中 2星',bank:'medium',blanks:[2,3],hand:4,shinyC:0.05,promoScore:30},
+  {label:'初中 3星',bank:'medium',blanks:[3,3],hand:4,shinyC:0.07,promoScore:30},
+  {label:'高中 1星',bank:'hard',blanks:[3,3],hand:5,shinyC:0.09,promoScore:40},
+  {label:'高中 2星',bank:'hard',blanks:[4,4],hand:5,shinyC:0.11,promoScore:40},
+  {label:'高中 3星',bank:'hard',blanks:[5,5],hand:5,shinyC:0.13,promoScore:40},
+  {label:'无尽',bank:'hard',blanks:[5,5],hand:6,shinyC:0.15,promoScore:40},
 ];
 
 const SOLO_BG_COLORS=['#f0f7ff','#e3f0fc','#d6e8f8','#c8dff4','#bbd6f0','#aeceed','#a0c5e9','#92bce5','#84b3e1','#76abde'];
