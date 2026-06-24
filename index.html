@@ -700,6 +700,29 @@ body {
 body.uppercase-mode .letter-slot,
 body.uppercase-mode .card { text-transform: uppercase; }
 
+.score-card-area { display:none; width:min(320px,80vw); margin-top:8px; }
+.score-card {
+  position:relative;
+  width:100%;
+  border:2px solid #36549e;
+  border-radius:12px;
+  padding:14px 14px 10px;
+  background:#fff;
+  cursor:pointer;
+  overflow:hidden;
+  min-height:68px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  transition:transform 0.15s;
+}
+.score-card:hover { transform:scale(1.02); }
+.sc-name { position:absolute; top:4px; left:10px; right:60px; font-size:clamp(20px,6vw,28px); font-weight:900; color:rgba(33,120,210,0.12); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.sc-date { position:absolute; top:4px; right:10px; font-size:11px; color:#e67e22; font-weight:bold; }
+.sc-stage { font-size:clamp(16px,4.5vw,22px); font-weight:900; color:#333; }
+.sc-score { position:absolute; right:14px; bottom:10px; font-size:clamp(20px,6vw,30px); font-weight:900; color:#36549e; }
+.sc-ver { position:absolute; right:10px; bottom:2px; font-size:9px; color:rgba(0,0,0,0.15); }
+
 .btn-rules {
   margin-top: 10px;
   padding: 8px 24px;
@@ -948,7 +971,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
     </div>
   </div>
   <div class="solo-score-area">
-    <div class="solo-score-box" id="soloScoreBox">0</div>
+    <div class="solo-score-box" id="soloScoreBox">0 <span style="font-size:0.6em">P</span></div>
   </div>
   <div class="solo-promo-area">
     <div class="solo-stage-row">
@@ -1006,6 +1029,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
     <div class="diff-btn" data-diff="medium" onclick="selectDiff('medium')">初中级</div>
     <div class="diff-btn" data-diff="hard" onclick="selectDiff('hard')">高中级</div>
   </div>
+  <div class="score-card-area" id="scoreCardArea"></div>
   <button class="btn btn-start" onclick="startGame()">开始游戏</button>
   <button class="btn-rules" onclick="showRules()">玩法说明</button>
   <div class="controls-hint" id="controlsHint">P1: 1/2/3 &nbsp;&nbsp; P2: 小键盘 1/2/3</div>
@@ -1165,6 +1189,7 @@ function selectMode(mode){
   document.getElementById('soloSubmodeSelect').style.display=mode==='solo'?'flex':'none';
   document.getElementById('soloDiffWrap').style.display=(mode==='solo'&&selectedSubmode==='study')?'block':'none';
   document.getElementById('soloDiffPopup').classList.remove('open');
+  if(mode==='solo'){renderScoreCard();}else{document.getElementById('scoreCardArea').style.display='none';}
   // swap rules content by mode
   const rb=document.getElementById('rulesBody');
   if(mode==='solo'){
@@ -1748,7 +1773,7 @@ function endGame(byGap){
         sBottom.style.alignItems='center';
         setTimeout(()=>{sBottom.style.transition='opacity 0.5s';sBottom.style.opacity='1';},100);
         document.getElementById('endText').textContent=byGap?'绝杀!':'';
-        document.getElementById('finalScores').textContent=`P1: ${G.p1Score} 分  |  P2: ${G.p2Score} 分`;
+        document.getElementById('finalScores').textContent=`P1: ${G.p1Score} P  |  P2: ${G.p2Score} P`;
       },1500);
     },600);
   },2200);
@@ -1921,6 +1946,113 @@ function syncVersion(){
   save.version=APP_VERSION;
   writeSave(save);
 }
+
+// ===== Score Records =====
+function getScoreRecords(){
+  const save=loadSave();
+  return save.records||[];
+}
+const MAX_RECORDS=10;
+function addScoreRecord(record){
+  const save=loadSave();
+  if(!save.records)save.records=[];
+  save.records.push(record);
+  // if over limit, remove lowest ranked
+  if(save.records.length>MAX_RECORDS){
+    const sorted=sortRecords(save.records);
+    save.records=sorted.slice(0,MAX_RECORDS);
+  }
+  writeSave(save);
+  renderScoreCard();
+}
+function canRecordRank(score,stageIdx,endlessLevel,tierLock,submode){
+  const records=getScoreRecords();
+  if(records.length<MAX_RECORDS)return true;
+  const candidate={score,stageIdx,endlessLevel,tierLock,submode};
+  const sorted=sortRecords(records);
+  const worst=sorted[sorted.length-1];
+  // compare candidate vs worst
+  const mwC=getModeWeight(candidate),mwW=getModeWeight(worst);
+  if(mwC<mwW)return true;
+  if(mwC>mwW)return false;
+  const swC=getStageWeight(candidate),swW=getStageWeight(worst);
+  if(swC>swW)return true;
+  if(swC<swW)return false;
+  return score>worst.score;
+}
+function getStageLabel(record){
+  if(record.tierLock){
+    const tierNames={easy:'小学级',medium:'初中级',hard:'高中级'};
+    return tierNames[record.tierLock]+' Lv.'+record.level;
+  }
+  if(record.stageIdx>=9)return '无尽'+(record.endlessLevel>0?' '+record.endlessLevel:'');
+  const tier=Math.floor(record.stageIdx/3);
+  const star=record.stageIdx%3+1;
+  const names=['小学级','初中级','高中级'];
+  return names[tier]+'★'.repeat(star);
+}
+function getModeWeight(record){
+  if(record.submode==='dungeon')return 0;
+  if(!record.tierLock)return 1;
+  return 2;
+}
+function getStageWeight(record){
+  if(record.stageIdx>=9)return 100+record.endlessLevel;
+  return record.stageIdx;
+}
+function sortRecords(records){
+  return records.slice().sort((a,b)=>{
+    const mw=getModeWeight(a)-getModeWeight(b);
+    if(mw!==0)return mw;
+    const sw=getStageWeight(b)-getStageWeight(a);
+    if(sw!==0)return sw;
+    return b.score-a.score;
+  });
+}
+function renderScoreCard(){
+  const card=document.getElementById('scoreCardArea');
+  if(!card)return;
+  const records=getScoreRecords();
+  if(records.length===0){
+    card.style.display='none';
+    return;
+  }
+  card.style.display='block';
+  const sorted=sortRecords(records);
+  const top=sorted[0];
+  const stage=getStageLabel(top);
+  const date=top.date||'';
+  card.innerHTML=`<div class="score-card" onclick="openLeaderboard()">
+    <span class="sc-name">${top.name||'???'}</span>
+    <span class="sc-date">${date}</span>
+    <span class="sc-stage">${stage}</span>
+    <span class="sc-score">${top.score} <span style="font-size:0.6em">P</span></span>
+    <span class="sc-ver">${top.version||''}</span>
+  </div>`;
+}
+function openLeaderboard(){
+  const records=getScoreRecords();
+  if(!records.length)return;
+  const sorted=sortRecords(records);
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  const box=document.createElement('div');
+  box.style.cssText='width:min(440px,90vw);max-height:65vh;overflow-y:auto;background:#fff;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;';
+  sorted.forEach(r=>{
+    const stage=getStageLabel(r);
+    const el=document.createElement('div');
+    el.className='score-card';
+    el.innerHTML=`<span class="sc-name">${r.name||'???'}</span><span class="sc-date">${r.date||''}</span><span class="sc-stage">${stage}</span><span class="sc-score">${r.score} <span style="font-size:0.6em">P</span></span><span class="sc-ver">${r.version||''}</span>`;
+    box.appendChild(el);
+  });
+  modal.appendChild(box);
+  const closeBtn=document.createElement('button');
+  closeBtn.textContent='继续加油';
+  closeBtn.style.cssText='margin-top:16px;padding:10px 32px;font-size:16px;font-weight:bold;background:#fff;border:2px solid #ddd;border-radius:20px;color:#333;cursor:pointer;';
+  closeBtn.onclick=()=>modal.remove();
+  modal.appendChild(closeBtn);
+  document.body.appendChild(modal);
+}
 function saveSettings(){
   const save=loadSave();
   save.usePrivate=document.getElementById('chkPrivateLib').checked;
@@ -2035,7 +2167,7 @@ function parseImportText(text){
 }
 
 // init on page load
-document.addEventListener('DOMContentLoaded',()=>{syncVersion();initSettingsFromSave();initSoloSubmodeUI();});
+document.addEventListener('DOMContentLoaded',()=>{syncVersion();initSettingsFromSave();initSoloSubmodeUI();renderScoreCard();});
 document.addEventListener('click',e=>{
   const popup=document.getElementById('soloDiffPopup');
   const trigger=document.getElementById('soloDiffTrigger');
@@ -2184,7 +2316,7 @@ function soloUpdateStageUI(){
   }
   document.getElementById('soloStageTag').textContent=label;
   document.getElementById('soloStars').textContent=subText;
-  document.getElementById('soloScoreBox').textContent=S.totalScore;
+  document.getElementById('soloScoreBox').innerHTML=S.totalScore+' <span style="font-size:0.6em">P</span>';
   const promoFill=document.getElementById('soloPromoFill');
   if(promoFill){
     const tgt=st.promoScore;
@@ -2910,9 +3042,14 @@ function soloEndGame(){
   // score header — pushed down more
   const header=document.createElement('div');
   header.style.cssText='position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding-top:80px;opacity:0;transition:opacity 0.6s;z-index:210;background:linear-gradient(to bottom,#fff 55%,transparent);pointer-events:none;';
+  const _canRecord=canRecordRank(S.totalScore,S.maxStageReached,S.endlessLevel,S.tierLock||null,selectedSubmode);
   header.innerHTML=`
-    <div style="font-size:72px;font-weight:900;color:#333;">${S.totalScore} 分</div>
+    <div style="font-size:72px;font-weight:900;color:#333;">${S.totalScore} <span style="font-size:0.5em">P</span></div>
     <div style="font-size:18px;color:#666;margin-top:6px;">答题: ${S.totalCorrect} &nbsp;&nbsp; 完美答题: ${S.perfectCount}</div>
+    ${_canRecord?`<div style="display:flex;align-items:center;gap:8px;margin-top:14px;pointer-events:auto;">
+      <input id="endNameInput" type="text" placeholder="输入玩家名" maxlength="12" style="width:180px;padding:8px 12px;font-size:16px;border:2px solid #ccc;border-radius:8px;outline:none;">
+      <button id="endRecordBtn" style="padding:8px 16px;font-size:15px;font-weight:bold;border:2px solid #2178d2;border-radius:8px;background:#fff;color:#2178d2;cursor:pointer;">记录</button>
+    </div>`:`<div style="font-size:13px;color:rgba(0,0,0,0.35);margin-top:14px;">只保存排名前十的记录</div>`}
   `;
   ov.appendChild(header);
 
@@ -2946,6 +3083,28 @@ function soloEndGame(){
       btnWrap.style.opacity='1';
       playSound(523,0.2);setTimeout(()=>playSound(659,0.2),150);setTimeout(()=>playSound(784,0.3),300);
       document.getElementById('endBookBtn').onclick=()=>soloShowEndWordbook(ov);
+      const _recBtn=document.getElementById('endRecordBtn');
+      if(_recBtn){ _recBtn.onclick=()=>{
+        const nameInput=document.getElementById('endNameInput');
+        const name=nameInput.value.trim();
+        if(!name){nameInput.style.borderColor='#e53935';nameInput.focus();return;}
+        const record={
+          name,
+          score:S.totalScore,
+          date:new Date().toLocaleDateString('sv-SE'),
+          stageIdx:S.maxStageReached,
+          endlessLevel:S.endlessLevel,
+          tierLock:S.tierLock||null,
+          level:S.tierLock?(S.maxStageReached>=9?(4+S.endlessLevel):((S.maxStageReached-({easy:0,medium:3,hard:6}[S.tierLock]||0))+1)):0,
+          submode:selectedSubmode,
+          version:APP_VERSION
+        };
+        addScoreRecord(record);
+        const btn=document.getElementById('endRecordBtn');
+        btn.textContent='已记录 ✓';
+        btn.style.borderColor='#4caf50';btn.style.color='#4caf50';
+        btn.onclick=null;
+      };}
     },(duration+0.3)*1000);
   });
 }
@@ -2995,6 +3154,7 @@ document.addEventListener('keydown',(e)=>{
 
 // debug commands
 window.tower_max=function(){if(selectedMode!=='solo')return 'Not in solo mode';S.stageIdx=9;S.maxStageReached=9;S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return 'Jumped to 无尽级';};
+window.tower_up=function(){if(selectedMode!=='solo')return 'Not in solo mode';if(S.stageIdx>=9){S.endlessLevel++;}else{S.stageIdx++;}S.maxStageReached=Math.max(S.maxStageReached,S.stageIdx);S.stageScore=0;S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return S.stageIdx>=9?'无尽 '+S.endlessLevel:'Stage '+S.stageIdx;};
 window.set_point=function(n){if(selectedMode!=='solo')return 'Not in solo mode';S.totalScore=n;soloUpdateStageUI();return 'Score set to '+n;};
 window.game_over=function(){if(selectedMode!=='solo')return 'Not in solo mode';soloEndGame();return 'Game ended';};
 
