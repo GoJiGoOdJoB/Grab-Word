@@ -232,10 +232,11 @@ body {
 }
 .letter-slot.bling { animation: bling 0.35s ease; }
 .word-status { font-size: 13px; height: 16px; color: #e53935; font-weight: bold; }
-#soloStatus { position:absolute; top:70px; right:20px; font-size:18px; height:auto; min-height:20px; line-height:1.5; text-align:right; z-index:5; color:#f5a623; font-weight:bold; max-width:45vw; }
+#soloStatus { position:absolute; top:84px; right:20px; font-size:18px; height:auto; min-height:20px; line-height:1.5; text-align:right; z-index:50; color:#f5a623; font-weight:bold; max-width:45vw; }
 
-.word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; }
+.word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; max-width:123px; margin:0 auto; }
 .word-star { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; }
+.word-stars .word-star:nth-child(-n+5) { transform:translateY(-3px); }
 .word-star svg { filter:drop-shadow(0 0 1px rgba(0,0,0,0.2)); }
 .word-star.normal svg polygon { fill:#999; stroke:#fff; stroke-width:1.5; }
 .word-star.shiny-star svg polygon { fill:#7e57c2; stroke:#fff; stroke-width:1.5; }
@@ -863,7 +864,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-cards-section .card { background:#fff; border:2px solid #2178d2; color:#2178d2; }
 .solo-book-section { width:100%; max-width:600px; display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border:1px solid #e0e0e0; border-radius:8px; background:#fff; min-height:38px; flex:1; overflow:hidden; min-height:0; }
 .solo-book-section .wordbook-item { }
-.solo-combo-box { position:absolute; top:12px; right:20px; font-size:36px; font-weight:900; color:#e53935; z-index:5; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
+.solo-combo-box { position:absolute; top:46px; right:20px; font-size:36px; font-weight:900; color:#e53935; z-index:50; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
 .solo-combo-box.animating { animation:comboFlash 0.4s ease; }
 .solo-pause-btn { padding:5px 10px; background:#fff; border:2px solid #ccc; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
 .solo-promote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(33,120,210,0.15); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
@@ -887,8 +888,8 @@ body.uppercase-mode .card { text-transform: uppercase; }
   .combo-box { font-size: 22px; padding: 2px 8px; top: 8px; }
   .combo-p1 { left: 6px; }
   .combo-p2 { right: 6px; }
-  .solo-combo-box { font-size: 24px; right: 10px; }
-  #soloStatus { top: 58px; right: 10px; font-size: 16px; }
+  .solo-combo-box { font-size: 24px; right: 10px; top: 42px; }
+  #soloStatus { top: 72px; right: 10px; font-size: 16px; }
   .pvp-center { top: 30px; width: 96vw; gap: 4px; }
   .timer-display { font-size: 18px; }
   .score-bar { height: 22px; }
@@ -2774,6 +2775,7 @@ function soloPassAction(){
   S.totalScore=Math.max(0,S.totalScore-penalty);
   S.stageScore-=penalty;
   document.getElementById('soloStatus').textContent=`-${penalty} (PASS)`;
+  soloAddWordBook('C');
   soloUpdateStageUI();
 
   // drop counter
@@ -2957,7 +2959,7 @@ function soloShowBurst(isPerfect){
 
 function soloUpdateCombo(){
   const el=document.getElementById('soloCombo');
-  el.textContent=S.combo>1?S.combo+'连击🔥':'';
+  el.textContent=S.combo>1?S.combo+'🔥':'';
   if(S.combo>1){el.classList.remove('animating');void el.offsetWidth;el.classList.add('animating');}
 }
 
