@@ -1256,7 +1256,7 @@ function selectMode(mode){
 function selectSubmode(sub){
   if(sub==='dungeon'){
     const highest=getLocalHighestStage();
-    if(highest<9){showToast('到达【无尽】后解锁');return;}
+    if(highest<7){showToast('到达【高中2星】后解锁');return;}
   }
   selectedSubmode=sub;
   document.querySelectorAll('.solo-submode-btn').forEach(b=>b.classList.remove('selected'));
@@ -1273,8 +1273,8 @@ function toggleSoloDiffPopup(){
 }
 function updateSoloDiffOptions(){
   const highest=getLocalHighestStage();
-  // 小学级: need >=3 (初中1星), 初中级: need >=6 (高中1星), 高中级: need >=9 (无尽)
-  const reqs={easy:3,medium:6,hard:9};
+  // 小学级: need >=0 (到达小学), 初中级: need >=3 (到达初中), 高中级: need >=6 (到达高中)
+  const reqs={easy:0,medium:3,hard:6};
   const names={easy:'小学级',medium:'初中级',hard:'高中级'};
   document.querySelectorAll('.solo-diff-option').forEach(opt=>{
     const tier=opt.dataset.tier;
@@ -1286,8 +1286,8 @@ function updateSoloDiffOptions(){
 }
 function selectSoloTier(tier){
   const highest=getLocalHighestStage();
-  const reqs={easy:3,medium:6,hard:9};
-  if(highest<reqs[tier]){showToast('未通过该段位最高层');return;}
+  const reqs={easy:0,medium:3,hard:6};
+  if(highest<reqs[tier]){showToast('未到达该难度段位');return;}
   if(soloLockedTier===tier){soloLockedTier=null;}
   else{soloLockedTier=tier;}
   const names={easy:'小学级',medium:'初中级',hard:'高中级'};
