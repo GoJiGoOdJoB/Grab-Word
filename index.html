@@ -240,7 +240,7 @@ body {
 
 .word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; max-width:123px; margin:0 auto; }
 .word-star { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; }
-.word-stars .word-star:nth-child(-n+5) { transform:translateY(-3px); }
+.word-stars .word-star:nth-child(-n+5) { transform:translateY(-23px); }
 .word-star svg { filter:drop-shadow(0 0 1px rgba(0,0,0,0.2)); }
 .word-star.normal svg polygon { fill:#999; stroke:#fff; stroke-width:1.5; }
 .word-star.shiny-star svg polygon { fill:#7e57c2; stroke:#fff; stroke-width:1.5; }
@@ -736,10 +736,10 @@ body.uppercase-mode .card { text-transform: uppercase; }
   transition:transform 0.15s;
 }
 .score-card:hover { transform:scale(1.02); }
-.sc-name { position:absolute; top:2px; left:10px; right:60px; font-size:clamp(18px,5vw,24px); font-weight:900; color:rgba(33,120,210,0.12); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.sc-name { position:absolute; top:1px; left:10px; right:60px; font-size:clamp(22px,6vw,28px); font-weight:900; color:rgba(33,120,210,0.12); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; line-height:1; }
 .sc-date { position:absolute; top:2px; right:10px; font-size:11px; color:#e67e22; font-weight:bold; }
-.sc-stage { font-size:clamp(16px,4.5vw,22px); font-weight:900; color:#333; margin-top:2px; }
-.sc-stats { display:flex; align-items:center; gap:10px; font-size:11px; color:#666; font-weight:bold; margin-top:2px; }
+.sc-stage { position:absolute; left:10px; bottom:18px; font-size:clamp(16px,4.5vw,22px); font-weight:900; color:#333; }
+.sc-stats { position:absolute; left:10px; bottom:2px; display:flex; align-items:center; gap:10px; font-size:11px; color:#666; font-weight:bold; }
 .sc-stats .sc-stat { display:flex; align-items:center; gap:3px; }
 .sc-stats .sc-icon-sq { width:10px; height:10px; background:#2178d2; border-radius:2px; }
 .sc-stats .sc-icon-circle { width:10px; height:10px; background:#f5a623; border-radius:50%; }
@@ -1122,6 +1122,13 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
           </div>
         </div>
         <div class="settings-page" id="settingsPageCache">
+          <div class="settings-cache-row">
+            <span>存档配置</span>
+            <div style="display:flex;gap:8px;">
+              <button class="settings-lib-btn" style="padding:6px 14px;font-size:13px;" onclick="exportSave()">导出</button>
+              <button class="settings-lib-btn" style="padding:6px 14px;font-size:13px;" onclick="importSave()">导入</button>
+            </div>
+          </div>
           <div class="settings-cache-row">
             <span>所有内容</span>
             <button class="settings-del-btn" onclick="confirmDelete('all')">删除</button>
@@ -2019,6 +2026,36 @@ function executeDelete(target){
     updateLibDelButtons();
     showToast('已删除词库');
   }
+}
+function exportSave(){
+  const save=loadSave();
+  const txt=JSON.stringify(save,null,2);
+  const blob=new Blob([txt],{type:'application/json;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='grabword_save.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function importSave(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json,application/json';
+  input.onchange=()=>{
+    const file=input.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const data=JSON.parse(reader.result);
+        writeSave(data);
+        renderScoreCard();
+        updateLibDelButtons();
+        showToast('存档已导入');
+      }catch(e){showToast('文件格式错误');}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 // ===== localStorage =====
