@@ -886,7 +886,7 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-cards-section .card { background:#fff; border:2px solid #2178d2; color:#2178d2; }
 .solo-book-section { width:100%; max-width:600px; display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border:1px solid #e0e0e0; border-radius:8px; background:#fff; min-height:38px; flex:1; overflow:hidden; min-height:0; }
 .solo-book-section .wordbook-item { }
-.solo-combo-box { position:absolute; top:46px; right:20px; font-size:36px; font-weight:900; color:#e53935; z-index:50; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
+.solo-combo-box { position:absolute; top:46px; right:max(20px, calc(50% - 300px)); font-size:36px; font-weight:900; color:#e53935; z-index:50; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
 .solo-combo-box.animating { animation:comboFlash 0.4s ease; }
 .solo-pause-btn { padding:5px 10px; background:#fff; border:2px solid #ccc; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
 .solo-promote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(33,120,210,0.15); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
@@ -1008,6 +1008,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
     </div>
     <div class="solo-promo-bar"><div class="solo-promo-fill" id="soloPromoFill"></div></div>
   </div>
+  <div id="dungeonShopArea" class="dungeon-shop-area" style="display:none;"></div>
   <div class="solo-word-section" id="soloWordSection">
     <div class="word-stars" id="soloWordStars"></div>
     <div class="word-chinese-top" id="soloCnTop"></div>
@@ -1022,7 +1023,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
     <button class="pass-btn" onclick="soloPassAction()">PASS <span class="key-hint-inline">[ ~ ]</span></button>
   </div>
   <div class="solo-book-section">
-    <span class="book-label">单词簿</span>
+    <span class="book-label" id="soloBookLabel">单词簿</span>
     <div class="wordbook" id="soloBook"></div>
   </div>
 </div>
@@ -1045,7 +1046,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
       </div>
     </div>
     <div class="solo-submode-btn selected" id="submodeStudy" onclick="selectSubmode('study')">学习屋</div>
-    <div class="solo-submode-btn" id="submodeDungeon" onclick="selectSubmode('dungeon')" style="display:none">>
+    <div class="solo-submode-btn" id="submodeDungeon" onclick="selectSubmode('dungeon')">
       <span class="submode-label">地下城</span>
       <div class="submode-lock-overlay" id="dungeonLock">
         <svg viewBox="0 0 24 28" width="28" height="32"><path d="M7 12V8a5 5 0 0 1 10 0v4" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round"/><rect x="4" y="12" width="16" height="13" rx="3" fill="#ccc"/></svg>
@@ -1256,7 +1257,7 @@ function selectMode(mode){
 function selectSubmode(sub){
   if(sub==='dungeon'){
     const highest=getLocalHighestStage();
-    if(highest<7){showToast('到达【高中2星】后解锁');return;}
+    if(highest<9){showToast('到达【无尽】后解锁');return;}
   }
   selectedSubmode=sub;
   document.querySelectorAll('.solo-submode-btn').forEach(b=>b.classList.remove('selected'));
@@ -2401,6 +2402,8 @@ function beginSoloGame(){
   S.wrongCount=0;
   S.wrongFlowPenalty=0;
   S.tierLock=soloLockedTier; // lock tier for this session
+  // 地牢模式不锁定段位
+  if(selectedSubmode==='dungeon') S.tierLock=null;
 
   // apply tier lock: start at lowest stage of that tier
   if(S.tierLock){
@@ -2409,6 +2412,13 @@ function beginSoloGame(){
     S.maxStageReached=S.stageIdx;
   }
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
+
+  // 地牢模式初始化
+  if(selectedSubmode==='dungeon' && window.Dungeon){
+    Dungeon.init();
+  } else if(window.Dungeon){
+    Dungeon.reset();
+  }
 
   soloUpdateStageUI();
   document.getElementById('soloTimer').textContent=soloFormatTime();
@@ -2420,7 +2430,12 @@ function soloStartTimer(){
   clearInterval(S.timerInterval);
   S.timerInterval=setInterval(()=>{
     if(!S.running)return;
-    S.timeLeft-=0.1*S.globalFlowRate;
+    let gflow = S.globalFlowRate;
+    if(window.Dungeon && Dungeon.isActive()){
+      gflow *= Dungeon.getFlowRateMultiplier();
+      gflow *= (1 + (Dungeon.state._shackleFlowBonus||0));
+    }
+    S.timeLeft-=0.1*gflow;
     if(S.timeLeft<0)S.timeLeft=0;
     document.getElementById('soloTimer').textContent=soloFormatTime();
     if(S.timeLeft<=0)soloEndGame();
@@ -2557,7 +2572,8 @@ function soloApplyWrongPenalty(){
 }
 
 function soloRollShiny(){
-  const c=soloStage().shinyC;
+  let c=soloStage().shinyC;
+  if(window.Dungeon && Dungeon.isActive()) c+=Dungeon.getShinyBonus();
   if(c<=0)return false;
   S.prdCounter++;
   if(Math.random()<c*S.prdCounter){S.prdCounter=0;return true;}
@@ -2615,7 +2631,12 @@ function soloStartWordTimer(){
   fill.style.width='100%';
   S.wordTimer=setInterval(()=>{
     if(!S.running)return;
-    S.wordTimerMs-=100*S.wordFlowRate*S.globalFlowRate;
+    let flowMult = S.wordFlowRate*S.globalFlowRate;
+    if(window.Dungeon && Dungeon.isActive()){
+      flowMult *= Dungeon.getFlowRateMultiplier();
+      flowMult *= (1 + (Dungeon.state._shackleFlowBonus||0));
+    }
+    S.wordTimerMs-=100*flowMult;
 
     // update bar within current layer
     const ratio=Math.max(0,S.wordTimerMs/4000);
@@ -2720,6 +2741,10 @@ function soloPlayCard(idx){
     const cd=S.wrongCount>=3?1000:500;
     setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');},cd);
     soloApplyWrongPenalty();
+    // 地牢：错牌压力(第3次起累计)
+    if(window.Dungeon && Dungeon.isActive() && S.wrongCount>=3){
+      Dungeon.addStress(S.wrongCount - 2);
+    }
     return;
   }
 
@@ -2781,6 +2806,8 @@ function soloCheckComplete(){
   // combo logic
   if(quality==='C'){
     S.combo=0; // combo break
+    // 地牢：后悔诅咒生效
+    if(window.Dungeon && Dungeon.isActive()) Dungeon.applyRegret();
   } else {
     S.combo++;
   }
@@ -2799,6 +2826,13 @@ function soloCheckComplete(){
 
   S.totalScore+=totalPts;
   S.stageScore+=totalPts;
+  // 地牢：力量额外段位积分 + 乏力减少
+  if(window.Dungeon && Dungeon.isActive() && totalPts>0){
+    let bonus = Dungeon.getPromoScoreBonus(totalPts);
+    const fatigueRed = Dungeon.getFatigueReduction();
+    if(fatigueRed>0) bonus = Math.round(bonus * (1-fatigueRed));
+    S.stageScore += bonus;
+  }
   S.correctCount++;
   S.streakCount++;
   S.totalCorrect++;
@@ -2817,6 +2851,10 @@ function soloCheckComplete(){
     S.totalScore+=burstBonus;S.stageScore+=burstBonus;
     if(burstPerfect){S.timeLeft=Math.min(999,S.timeLeft+5);soloShowTimeBonus('+5 (完美爆发)');}
     soloShowBurst(burstPerfect);
+    // 地牢：连击爆发金币
+    if(window.Dungeon && Dungeon.isActive()){
+      Dungeon.addGold(burstPerfect? Dungeon.cfg.goldPerPerfectBurst : Dungeon.cfg.goldPerBurst);
+    }
     S.burstCounter=0;S.burstQualities=[];
   }
 
@@ -2907,6 +2945,10 @@ function soloPassAction(){
   document.getElementById('soloStatus').textContent=`-${penalty} (PASS)`;
   soloAddWordBook('C');
   soloUpdateStageUI();
+  // 地牢：PASS压力
+  if(window.Dungeon && Dungeon.isActive()){
+    Dungeon.addStress(3);
+  }
 
   // drop counter
   S.dropCounter=Math.min(S.dropCounter+1,5);
@@ -2981,6 +3023,29 @@ function soloPromote(){
   setTimeout(()=>{flash.remove();},1200);
 
   soloUpdateStageUI();
+
+  // 地牢模式：升段奖励 + 压力 + Boss + 商城
+  if(window.Dungeon && Dungeon.isActive()){
+    const dTier = S.stageIdx>=9?'endless':(S.stageIdx>=6?'hard':(S.stageIdx>=3?'medium':'easy'));
+    const goldReward = Dungeon.cfg.goldPerPromote[dTier]||3;
+    Dungeon.addGold(goldReward);
+    const stressAmt = Dungeon.cfg.stressPerPromote[dTier]||5;
+    Dungeon.addStress(stressAmt);
+    // Boss关退出(如之前是boss)
+    if(Dungeon.state.bossActive) Dungeon.exitBoss();
+    // 检查新段是否boss (3星: stageIdx 2,5,8; endless每3级)
+    if(Dungeon.checkBoss(S.stageIdx)) Dungeon.enterBoss();
+    // 强化环节(初中级起)
+    if(Dungeon.shouldShowShop(S.stageIdx)){
+      S.transitioning=true;
+      setTimeout(()=>{
+        if(!S.running){S.transitioning=false;return;}
+        Dungeon.openShop();
+        S.transitioning=false;
+      },1000);
+      return; // shop will call soloSetupWord on close
+    }
+  }
 
   // next word after flash
   S.transitioning=true;
@@ -3094,6 +3159,8 @@ function soloUpdateCombo(){
 }
 
 function soloAddWordBook(quality){
+  // 地牢模式不记录单词簿
+  if(window.Dungeon && Dungeon.isActive()) return;
   const book=document.getElementById('soloBook');
   const item=document.createElement('span');item.className='wordbook-item';
   const colors={S:'#2178d2',A:'#4caf50',B:'#f9a825',C:'#e53935'};
@@ -3108,6 +3175,8 @@ function soloAddWordBook(quality){
 
 function soloEndGame(){
   S.running=false;clearInterval(S.timerInterval);clearInterval(S.wordTimer);
+  // 地牢模式清理
+  if(window.Dungeon && Dungeon.isActive()) Dungeon.reset();
   saveLocalHighestStage(S.maxStageReached);
   const maxReached=S.maxStageReached;
   const tierLabels=['小学级','初中级','高中级','无尽'];
@@ -3295,5 +3364,6 @@ window.game_over=function(){if(selectedMode!=='solo')return 'Not in solo mode';s
 // default to solo tower on load
 selectMode('solo');
 </script>
+<script src="dungeon.js"></script>
 </body>
 </html>
