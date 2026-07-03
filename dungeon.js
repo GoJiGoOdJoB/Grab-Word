@@ -331,7 +331,7 @@ function dungeonRenderShop(){
   // Header (title centered, no currencies)
   area.innerHTML = `
     <div class="dshop-header">
-      <div class="dshop-title">强化交易所</div>
+      <div class="dshop-title">强化</div>
     </div>
   `;
 
