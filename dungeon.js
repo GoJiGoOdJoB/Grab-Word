@@ -356,6 +356,9 @@ function dungeonRenderShop(){
 
   document.getElementById('dungeonShopContinue').onclick = dungeonCloseShop;
   if(typeof playSound==='function'){playSound(523,0.15);setTimeout(()=>playSound(784,0.15),100);setTimeout(()=>playSound(1047,0.2),200);}
+
+  // 悬浮拨动效果
+  dungeonApplyCardTilt(area);
 }
 
 // ===== 商品卡片 HTML 生成 =====
@@ -593,8 +596,11 @@ function dungeonBindCardClicks(section, currency){
       const price = parseInt(card.dataset.price);
       const cur   = card.dataset.cur;
       if(!dungeonCanAfford(price, cur)) {
-        card.style.outline='2px solid #e53935';
-        setTimeout(()=>card.style.outline='',500);
+        // 抖动效果
+        card.classList.remove('dcard-shake');
+        void card.offsetWidth;
+        card.classList.add('dcard-shake');
+        card.addEventListener('animationend', ()=>card.classList.remove('dcard-shake'), {once:true});
         return;
       }
       dungeonDeductCost(price, cur);
@@ -751,7 +757,47 @@ function dungeonHideUI(){
   });
 }
 
-// ===== 注入CSS =====
+// ===== 卡片3D悬浮拨动交互 =====
+function dungeonApplyCardTilt(container){
+  const MAX_TILT = 14;
+
+  function applyTilt(card, cx, cy){
+    const rect = card.getBoundingClientRect();
+    const x = (cx - rect.left) / rect.width  - 0.5;
+    const y = (cy - rect.top)  / rect.height - 0.5;
+    card.style.transition = 'box-shadow 0.25s, border-color 0.15s';
+    card.style.transform = `perspective(600px) rotateX(${-y*MAX_TILT}deg) rotateY(${x*MAX_TILT}deg) translateY(-4px) scale(1.02)`;
+  }
+
+  function resetTilt(card){
+    card.style.transition = 'transform 0.3s ease, box-shadow 0.25s, border-color 0.15s';
+    card.style.transform = 'perspective(600px) translateY(-2px)';
+  }
+
+  // 鼠标移动时倾斜
+  container.addEventListener('mousemove', e=>{
+    const card = e.target.closest('.dcard:not(.dcard-bought)');
+    if(!card) return;
+    applyTilt(card, e.clientX, e.clientY);
+  });
+
+  // 鼠标离开时复位（委托到每张卡片）
+  container.addEventListener('mouseleave', e=>{
+    const card = e.target.closest?.('.dcard:not(.dcard-bought)');
+    if(card) resetTilt(card);
+  }, true);
+
+  // 触摸滑动倾斜
+  container.addEventListener('touchmove', e=>{
+    const t = e.touches[0];
+    const card = document.elementFromPoint(t.clientX, t.clientY)?.closest('.dcard:not(.dcard-bought)');
+    if(card) applyTilt(card, t.clientX, t.clientY);
+  }, {passive:true});
+
+  container.addEventListener('touchend', ()=>{
+    container.querySelectorAll('.dcard:not(.dcard-bought)').forEach(c=>resetTilt(c));
+  }, {passive:true});
+}
 const style = document.createElement('style');
 style.textContent = `
 @keyframes dungeonCurseFlash {
@@ -834,13 +880,30 @@ style.textContent = `
 .dcard {
   border:2px solid #e0e0e0;border-radius:10px;
   background:#fff;overflow:hidden;
-  cursor:pointer;transition:border-color 0.15s,opacity 0.2s;
+  cursor:pointer;
   display:flex;flex-direction:column;
   min-height:90px;
   user-select:none;
+  transform: perspective(600px) translateY(-2px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+  transition: box-shadow 0.25s, transform 0.15s, border-color 0.15s;
+  will-change: transform;
 }
-.dcard:hover { border-color:#aaa; }
-.dcard.dcard-bought { opacity:0.38;pointer-events:none; }
+.dcard:hover { border-color:#bbb; box-shadow:0 5px 14px rgba(0,0,0,0.11), 0 2px 5px rgba(0,0,0,0.07); }
+.dcard.dcard-bought {
+  opacity:0.4;pointer-events:none;
+  transform:perspective(600px) translateY(3px) !important;
+  box-shadow:none !important;
+  filter:grayscale(0.3);
+}
+.dcard.dcard-shake { animation:dcardShake 0.35s ease; }
+@keyframes dcardShake {
+  0%,100% { transform:perspective(600px) translateY(-2px) translateX(0); }
+  20%      { transform:perspective(600px) translateY(-2px) translateX(-6px); }
+  40%      { transform:perspective(600px) translateY(-2px) translateX(6px); }
+  60%      { transform:perspective(600px) translateY(-2px) translateX(-4px); }
+  80%      { transform:perspective(600px) translateY(-2px) translateX(4px); }
+}
 
 /* ---- 属性升级卡 ---- */
 .dcard-body {
