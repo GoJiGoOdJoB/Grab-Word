@@ -3360,6 +3360,15 @@ window.tower_max=function(){if(selectedMode!=='solo')return 'Not in solo mode';S
 window.tower_up=function(){if(selectedMode!=='solo')return 'Not in solo mode';if(S.stageIdx>=9){S.endlessLevel++;}else{S.stageIdx++;}S.maxStageReached=Math.max(S.maxStageReached,S.stageIdx);S.stageScore=0;S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return S.stageIdx>=9?'无尽 '+S.endlessLevel:'Stage '+S.stageIdx;};
 window.set_point=function(n){if(selectedMode!=='solo')return 'Not in solo mode';S.totalScore=n;soloUpdateStageUI();return 'Score set to '+n;};
 window.game_over=function(){if(selectedMode!=='solo')return 'Not in solo mode';soloEndGame();return 'Game ended';};
+window.shop=function(stageIdx){
+  if(!window.Dungeon) return 'Dungeon module not loaded';
+  if(selectedMode!=='solo') return 'Not in solo mode';
+  if(!S.running){ return 'Game not running — start a dungeon game first'; }
+  if(stageIdx!==undefined) S.stageIdx=Math.max(0,Math.min(9,stageIdx));
+  if(!Dungeon.isActive()) Dungeon.init();
+  Dungeon.openShop();
+  return 'Shop opened at stageIdx='+S.stageIdx;
+};
 
 // default to solo tower on load
 selectMode('solo');

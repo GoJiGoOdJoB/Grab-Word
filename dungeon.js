@@ -358,9 +358,92 @@ function dungeonRenderShop(){
   if(typeof playSound==='function'){playSound(523,0.15);setTimeout(()=>playSound(784,0.15),100);setTimeout(()=>playSound(1047,0.2),200);}
 }
 
+// ===== 商品卡片 HTML 生成 =====
+
+// 属性升级卡片
+// currency: 'g'|'p'|'t'
+function dungeonAttrCardHTML(attrKey, currency){
+  const cnName  = ATTR_NAMES[attrKey];
+  const enName  = {str:'Strength',wis:'Wisdom',brv:'Bravery',end:'Endurance',dex:'Dexterity',luk:'Luck'}[attrKey];
+  const curLv   = D.attrs[attrKey];
+  const nextLv  = curLv + 1;
+  const price   = Math.round(
+    DUNGEON_CFG.attrPriceBase
+    * Math.pow(DUNGEON_CFG.attrPriceLevelCoeff, curLv)
+    * Math.pow(DUNGEON_CFG.attrPriceStageCoeff, Math.floor((typeof S!=='undefined'?S.stageIdx:0)/3))
+  );
+  const cur     = currency.toUpperCase();
+  return `
+    <div class="dcard dcard-attr" data-attr="${attrKey}" data-price="${price}" data-cur="${cur}">
+      <div class="dcard-body">
+        <div class="dcard-row-top">
+          <span class="dcard-cn">${cnName}</span>
+          <span class="dcard-en">${enName}</span>
+        </div>
+        <div class="dcard-row-lv">
+          <span class="dcard-lv-cur">Lv.${curLv}</span>
+          <span class="dcard-arrow"></span>
+          <span class="dcard-lv-next">Lv.${nextLv}</span>
+        </div>
+      </div>
+      <div class="dcard-cost dcard-cost-${cur.toLowerCase()}">
+        <span class="dcard-cost-num">${price}</span>
+        <span class="dcard-cost-unit">${cur}</span>
+      </div>
+    </div>`;
+}
+
+// 道具卡片
+function dungeonItemCardHTML(itemDef, currency){
+  const cur = currency.toUpperCase();
+  return `
+    <div class="dcard dcard-item" data-item="${itemDef.id}" data-price="${itemDef.price}" data-cur="${cur}">
+      <div class="dcard-body dcard-body-item">
+        <div class="dcard-item-text">
+          <span class="dcard-item-en">${itemDef.nameEn||itemDef.id}</span>
+          <span class="dcard-item-cn">${itemDef.name}</span>
+        </div>
+        <div class="dcard-item-icon"></div>
+      </div>
+      <div class="dcard-cost dcard-cost-${cur.toLowerCase()}">
+        <span class="dcard-cost-num">${itemDef.price}</span>
+        <span class="dcard-cost-unit">${cur}</span>
+      </div>
+    </div>`;
+}
+
+// 道具数据表
+const ITEM_DEFS_LOW = [
+  {id:'shield',   name:'护盾',   nameEn:'Shield',   price:5},
+  {id:'focus',    name:'专注',   nameEn:'Focus',    price:4},
+  {id:'insight',  name:'洞察',   nameEn:'Insight',  price:4},
+  {id:'goldpot',  name:'金币罐', nameEn:'Gold Pot', price:3},
+];
+const ITEM_DEFS_HIGH = [
+  {id:'purify',   name:'净化',   nameEn:'Purify',   price:10},
+  {id:'lucky',    name:'幸运星', nameEn:'Lucky Star',price:9},
+  {id:'slowdown', name:'缓行者', nameEn:'Slowdown', price:12},
+];
+const ITEM_DEFS_TIME = [
+  {id:'rewind',   name:'时间回溯',nameEn:'Rewind',   price:8},
+  {id:'medkit',   name:'急救包',  nameEn:'Med Kit',  price:6},
+];
+
 function dungeonRenderGSection(){
   const section = document.createElement('div');
   section.className = 'dshop-section dshop-section-g';
+
+  // 生成 G 区 6 个槽位内容
+  const attrPool = shuffle(ATTR_KEYS.slice());
+  const cards = [
+    dungeonAttrCardHTML(attrPool[0], 'g'),                                       // 1: 固定属性
+    Math.random()<0.7 ? dungeonAttrCardHTML(attrPool[1],'g') : dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'), // 2
+    Math.random()<0.4 ? dungeonAttrCardHTML(attrPool[2],'g') : dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'), // 3
+    dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0], 'g'),                  // 4
+    Math.random()<0.6 ? dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0],'g') : dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'), // 5
+    dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0], 'g'),                 // 6: 固定高价值
+  ];
+
   section.innerHTML = `
     <div class="dshop-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -370,20 +453,30 @@ function dungeonRenderGSection(){
       <button class="dshop-reroll dshop-reroll-g">⟳ 2G</button>
     </div>
     <div class="dshop-grid dshop-grid-6">
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
+      ${cards.join('')}
     </div>
   `;
+  dungeonBindCardClicks(section, 'g');
   return section;
 }
 
 function dungeonRenderPSection(){
   const section = document.createElement('div');
   section.className = 'dshop-section dshop-section-p';
+
+  const attrs = shuffle(ATTR_KEYS.slice()).slice(0,2);
+  const timePrice = Math.round(
+    DUNGEON_CFG.timeBuyPriceBase
+    * Math.pow(DUNGEON_CFG.timeBuyCountCoeff, D.timeBuyCount)
+    * Math.pow(DUNGEON_CFG.timeBuyStageCoeff, Math.floor((typeof S!=='undefined'?S.stageIdx:0)/3))
+  );
+  const buyTimeItem = {id:'buytime', name:'购买时间', nameEn:'Buy Time +10s', price:timePrice};
+  const cards = [
+    dungeonItemCardHTML(buyTimeItem, 'p'),
+    dungeonAttrCardHTML(attrs[0], 'p'),
+    dungeonAttrCardHTML(attrs[1], 'p'),
+  ];
+
   section.innerHTML = `
     <div class="dshop-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -393,17 +486,25 @@ function dungeonRenderPSection(){
       <button class="dshop-reroll dshop-reroll-p">⟳ 15P</button>
     </div>
     <div class="dshop-grid dshop-grid-3">
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
+      ${cards.join('')}
     </div>
   `;
+  dungeonBindCardClicks(section, 'p');
   return section;
 }
 
 function dungeonRenderTSection(){
   const section = document.createElement('div');
   section.className = 'dshop-section dshop-section-t';
+
+  const goldPrice = Math.round(DUNGEON_CFG.goldBuyPriceBase * Math.pow(DUNGEON_CFG.goldBuyCountCoeff, D.goldBuyCount));
+  const buyGoldItem = {id:'buygold', name:'购买金币', nameEn:'Buy Gold +3G', price:goldPrice};
+  const cards = [
+    dungeonItemCardHTML(buyGoldItem, 't'),
+    dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0], 't'),
+    dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[1]||ITEM_DEFS_TIME[0], 't'),
+  ];
+
   section.innerHTML = `
     <div class="dshop-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -413,11 +514,10 @@ function dungeonRenderTSection(){
       <button class="dshop-reroll dshop-reroll-t">⟳ 5s</button>
     </div>
     <div class="dshop-grid dshop-grid-3">
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
+      ${cards.join('')}
     </div>
   `;
+  dungeonBindCardClicks(section, 't');
   return section;
 }
 
@@ -437,6 +537,68 @@ function dungeonRenderCSection(){
     </div>
   `;
   return section;
+}
+
+// 绑定卡片点击购买
+function dungeonBindCardClicks(section, currency){
+  section.querySelectorAll('.dcard').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      if(card.classList.contains('dcard-bought')) return;
+      const price = parseInt(card.dataset.price);
+      const cur   = card.dataset.cur;
+      if(!dungeonCanAfford(price, cur)) {
+        card.style.outline='2px solid #e53935';
+        setTimeout(()=>card.style.outline='',500);
+        return;
+      }
+      dungeonDeductCost(price, cur);
+      card.classList.add('dcard-bought');
+      // 执行效果
+      if(card.classList.contains('dcard-attr')){
+        const attrKey = card.dataset.attr;
+        D.attrs[attrKey]++;
+        dungeonApplyCurseEffects();
+        dungeonRenderStateArea();
+      } else {
+        dungeonApplyItemEffect(card.dataset.item);
+        dungeonRenderStateArea();
+      }
+    });
+  });
+}
+
+function dungeonCanAfford(price, cur){
+  if(typeof S==='undefined') return false;
+  if(cur==='G') return D.gold >= price;
+  if(cur==='P') return S.totalScore >= price;
+  if(cur==='T') return S.timeLeft >= price;
+  return false;
+}
+
+function dungeonDeductCost(price, cur){
+  if(cur==='G') D.gold-=price, dungeonRenderGoldUI();
+  if(cur==='P') S.totalScore=Math.max(0,S.totalScore-price);
+  if(cur==='T') S.timeLeft=Math.max(0,S.timeLeft-price);
+}
+
+function dungeonApplyItemEffect(itemId){
+  switch(itemId){
+    case 'shield':   D.items.push({id:'shield',   remaining:3}); break;
+    case 'focus':    D.items.push({id:'focus',    remaining:1}); break;
+    case 'insight':  D.items.push({id:'insight',  remaining:1}); break;
+    case 'goldpot':  D.items.push({id:'goldpot',  remaining:1}); break;
+    case 'purify': {
+      const keys=Object.keys(D.curses);
+      if(keys.length){ const k=keys[Math.floor(Math.random()*keys.length)]; D.curses[k]--; if(D.curses[k]<=0) delete D.curses[k]; dungeonApplyCurseEffects(); }
+      break;
+    }
+    case 'lucky':    D.items.push({id:'lucky',    remaining:1}); break;
+    case 'slowdown': D.items.push({id:'slowdown', remaining:999}); break;
+    case 'buytime':  if(typeof S!=='undefined'){S.timeLeft+=10; D.timeBuyCount++;} break;
+    case 'buygold':  D.gold+=3; D.goldBuyCount++; dungeonRenderGoldUI(); break;
+    case 'rewind':   D.items.push({id:'rewind',   remaining:1}); break;
+    case 'medkit':   D.items.push({id:'medkit',   remaining:1}); break;
+  }
 }
 
 function dungeonCloseShop(){
@@ -621,6 +783,70 @@ style.textContent = `
   cursor:pointer;transition:all 0.2s;
 }
 .dshop-slot:hover { border-color:#999; }
+
+/* ===== 商品卡片 ===== */
+.dcard {
+  border:2px solid #e0e0e0;border-radius:10px;
+  background:#fff;overflow:hidden;
+  cursor:pointer;transition:border-color 0.15s,opacity 0.2s;
+  display:flex;flex-direction:column;
+  min-height:90px;
+  user-select:none;
+}
+.dcard:hover { border-color:#aaa; }
+.dcard.dcard-bought { opacity:0.38;pointer-events:none; }
+
+/* ---- 属性升级卡 ---- */
+.dcard-body {
+  flex:1;padding:7px 8px 4px;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+.dcard-row-top {
+  display:flex;justify-content:space-between;align-items:flex-start;
+}
+.dcard-cn  { font-size:15px;font-weight:bold;color:#222;line-height:1.2; }
+.dcard-en  { font-size:10px;color:#888;line-height:1.2;text-align:right; }
+.dcard-row-lv {
+  display:flex;align-items:flex-end;gap:0;
+  margin-top:2px;
+}
+.dcard-lv-cur  { font-size:13px;font-weight:900;color:#555;line-height:1; }
+.dcard-arrow {
+  flex:1;min-width:14px;height:20px;
+  background:#f9a825;
+  clip-path:polygon(0% 100%, 100% 0%, 100% 100%);
+  margin:0 4px;align-self:flex-end;
+}
+.dcard-lv-next { font-size:28px;font-weight:900;color:#111;line-height:1; }
+
+/* ---- 道具卡 ---- */
+.dcard-body-item {
+  flex-direction:row !important;align-items:stretch;padding:7px 8px 4px;
+}
+.dcard-item-text { flex:1;display:flex;flex-direction:column;justify-content:space-between; }
+.dcard-item-en   { font-size:10px;color:#666;line-height:1.3; }
+.dcard-item-cn   { font-size:16px;font-weight:bold;color:#111;line-height:1.2; }
+.dcard-item-icon {
+  width:34px;height:34px;align-self:center;flex-shrink:0;
+  background:#ddd;border-radius:6px;margin-left:6px;
+}
+
+/* ---- 费用条 ---- */
+.dcard-cost {
+  display:flex;align-items:center;justify-content:flex-end;gap:6px;
+  padding:5px 10px;
+  border:2px solid #e0e0e0;border-radius:0 0 8px 8px;
+  border-top:none;background:#fafafa;font-weight:bold;
+}
+.dcard-cost-num { font-size:15px;color:#333; }
+.dcard-cost-unit { font-size:15px; }
+/* zone colors */
+.dcard-cost-g { border-color:#ffc107; background:#fff3cd; }
+.dcard-cost-g .dcard-cost-unit { color:#b8860b; }
+.dcard-cost-p { border-color:#64b5f6; background:#e0f0fd; }
+.dcard-cost-p .dcard-cost-unit { color:#2178d2; }
+.dcard-cost-t { border-color:#81c784; background:#e6f4e6; }
+.dcard-cost-t .dcard-cost-unit { color:#388e3c; }
 
 .dshop-footer { margin-top:12px;text-align:center; }
 .dshop-continue {
