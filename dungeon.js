@@ -521,9 +521,41 @@ function dungeonRenderTSection(){
   return section;
 }
 
+// 诅咒组合道具数据
+const CURSE_COMBO_DEFS = [
+  { itemId:'immortal', itemName:'不灭之心', itemNameEn:'Immortal Heart', curseKey:'fatigue',  curseName:'乏力',   curseNameEn:'Fatigue',   curses:1 },
+  { itemId:'timelord', itemName:'时间领主', itemNameEn:'Time Lord',      curseKey:'shackle',  curseName:'镣铐',   curseNameEn:'Shackle',   curses:2 },
+  { itemId:'essence',  itemName:'属性精华', itemNameEn:'Attr Essence',   curseKey:'illusion', curseName:'幻觉',   curseNameEn:'Illusion',  curses:1 },
+  { itemId:'double',   itemName:'双倍积分', itemNameEn:'Double Score',   curseKey:'regret',   curseName:'后悔',   curseNameEn:'Regret',    curses:2 },
+  { itemId:'immune',   itemName:'诅咒免疫', itemNameEn:'Curse Immune',   curseKey:'daze',     curseName:'恍惚',   curseNameEn:'Daze',      curses:3 },
+];
+
+// 诅咒组合卡片 HTML
+function dungeonCurseCardHTML(combo){
+  return `
+    <div class="dcard dcard-curse" data-item="${combo.itemId}" data-curse="${combo.curseKey}" data-curses="${combo.curses}">
+      <div class="dcard-body dcard-body-curse">
+        <div class="dcurse-half dcurse-item-half">
+          <span class="dcurse-item-en">${combo.itemNameEn}</span>
+          <span class="dcurse-item-cn">${combo.itemName}</span>
+          <div class="dcurse-icon dcurse-item-icon"></div>
+        </div>
+        <div class="dcurse-half dcurse-curse-half">
+          <div class="dcurse-icon dcurse-curse-icon"></div>
+          <span class="dcurse-curse-cn">${combo.curseName}</span>
+          <span class="dcurse-curse-en">${combo.curseNameEn}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function dungeonRenderCSection(){
   const section = document.createElement('div');
   section.className = 'dshop-section dshop-section-c';
+
+  const picks = shuffle(CURSE_COMBO_DEFS.slice()).slice(0, 2);
+  const cards = picks.map(c => dungeonCurseCardHTML(c));
+
   section.innerHTML = `
     <div class="dshop-section-header">
       <div style="display:flex;align-items:center;gap:8px;">
@@ -532,10 +564,24 @@ function dungeonRenderCSection(){
       </div>
     </div>
     <div class="dshop-grid dshop-grid-2">
-      <div class="dshop-slot"></div>
-      <div class="dshop-slot"></div>
+      ${cards.join('')}
     </div>
   `;
+
+  // 绑定点击
+  section.querySelectorAll('.dcard-curse').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      if(card.classList.contains('dcard-bought')) return;
+      card.classList.add('dcard-bought');
+      // 触发道具效果
+      dungeonApplyItemEffect(card.dataset.item);
+      // 附加对应诅咒
+      const n = parseInt(card.dataset.curses) || 1;
+      for(let i=0;i<n;i++) dungeonTriggerCurse();
+      dungeonRenderStateArea();
+    });
+  });
+
   return section;
 }
 
@@ -847,6 +893,44 @@ style.textContent = `
 .dcard-cost-p .dcard-cost-unit { color:#2178d2; }
 .dcard-cost-t { border-color:#81c784; background:#e6f4e6; }
 .dcard-cost-t .dcard-cost-unit { color:#388e3c; }
+.dcard-cost-c { border-color:#ce93d8; background:#f5e9f7; }
+
+/* ---- 诅咒组合卡 ---- */
+.dcard-body-curse {
+  position:relative;
+  display:block;
+  padding:0;
+  overflow:hidden;
+  flex:1;
+  min-height:68px;
+}
+.dcurse-half {
+  position:absolute;
+  top:0;left:0;width:100%;height:100%;
+  padding:6px 8px;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+/* 左上→右下 斜切：左侧道具区 */
+.dcurse-item-half {
+  clip-path:polygon(0% 0%, 62% 0%, 38% 100%, 0% 100%);
+  background:#fff;
+  align-items:flex-start;
+}
+/* 右上→左下 斜切：右侧诅咒区 */
+.dcurse-curse-half {
+  clip-path:polygon(62% 0%, 100% 0%, 100% 100%, 38% 100%);
+  background:#f5e9f7;
+  align-items:flex-end;
+  text-align:right;
+}
+.dcurse-item-en  { font-size:10px;color:#666;line-height:1.2;max-width:55%; }
+.dcurse-item-cn  { font-size:15px;font-weight:bold;color:#111;line-height:1.2;max-width:55%; }
+.dcurse-curse-cn { font-size:15px;font-weight:bold;color:#7b1fa2;line-height:1.2;max-width:55%; }
+.dcurse-curse-en { font-size:10px;color:#9c27b0;line-height:1.2;max-width:55%; }
+.dcurse-icon {
+  width:28px;height:28px;
+  border-radius:5px;background:#ddd;flex-shrink:0;
+}
 
 .dshop-footer { margin-top:12px;text-align:center; }
 .dshop-continue {
