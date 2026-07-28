@@ -357,7 +357,8 @@ function dungeonRenderShop(){
   document.getElementById('dungeonShopContinue').onclick = dungeonCloseShop;
   if(typeof playSound==='function'){playSound(523,0.15);setTimeout(()=>playSound(784,0.15),100);setTimeout(()=>playSound(1047,0.2),200);}
 
-  // 悬浮拨动效果
+  // 初始化可购买状态（灰色遮罩）
+  dungeonUpdateDisabledState();
   dungeonApplyCardTilt(area);
 }
 
@@ -453,13 +454,14 @@ function dungeonRenderGSection(){
         <span class="dshop-section-icon dshop-icon-g">G</span>
         <span class="dshop-section-label">金币交易</span>
       </div>
-      <button class="dshop-reroll dshop-reroll-g">⟳ 2G</button>
+      <button class="dshop-reroll dshop-reroll-g" data-price="2" data-cur="G">⟳ 2G</button>
     </div>
     <div class="dshop-grid dshop-grid-6">
       ${cards.join('')}
     </div>
   `;
   dungeonBindCardClicks(section, 'g');
+  dungeonBindRerollBtn(section);
   return section;
 }
 
@@ -486,13 +488,14 @@ function dungeonRenderPSection(){
         <span class="dshop-section-icon dshop-icon-p">P</span>
         <span class="dshop-section-label">分数交易</span>
       </div>
-      <button class="dshop-reroll dshop-reroll-p">⟳ 15P</button>
+      <button class="dshop-reroll dshop-reroll-p" data-price="15" data-cur="P">⟳ 15P</button>
     </div>
     <div class="dshop-grid dshop-grid-3">
       ${cards.join('')}
     </div>
   `;
   dungeonBindCardClicks(section, 'p');
+  dungeonBindRerollBtn(section);
   return section;
 }
 
@@ -514,13 +517,14 @@ function dungeonRenderTSection(){
         <span class="dshop-section-icon dshop-icon-t">T</span>
         <span class="dshop-section-label">时间交易</span>
       </div>
-      <button class="dshop-reroll dshop-reroll-t">⟳ 5s</button>
+      <button class="dshop-reroll dshop-reroll-t" data-price="5" data-cur="T">⟳ 5s</button>
     </div>
     <div class="dshop-grid dshop-grid-3">
       ${cards.join('')}
     </div>
   `;
   dungeonBindCardClicks(section, 't');
+  dungeonBindRerollBtn(section);
   return section;
 }
 
@@ -588,6 +592,87 @@ function dungeonRenderCSection(){
   return section;
 }
 
+// 绑定刷新按钮点击（与卡片相同的负担判断逻辑）
+function dungeonBindRerollBtn(section){
+  const btn = section.querySelector('.dshop-reroll[data-price]');
+  if(!btn) return;
+  btn.addEventListener('click', ()=>{
+    const price = parseInt(btn.dataset.price);
+    const cur   = btn.dataset.cur;
+    if(!dungeonCanAfford(price, cur)){
+      dungeonPlayDullSound();
+      return;
+    }
+    btn.classList.add('full-press');
+    setTimeout(()=>{
+      btn.classList.remove('full-press');
+      dungeonDeductCost(price, cur);
+      // 刷新本区域所有卡片（重新渲染 section）
+      const grid = section.querySelector('.dshop-grid');
+      if(!grid) return;
+      const currency = cur.toLowerCase();
+      let newCards = [];
+      if(currency==='g'){
+        const attrPool = shuffle(ATTR_KEYS.slice());
+        newCards = [
+          dungeonAttrCardHTML(attrPool[0],'g'),
+          Math.random()<0.7?dungeonAttrCardHTML(attrPool[1],'g'):dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
+          Math.random()<0.4?dungeonAttrCardHTML(attrPool[2],'g'):dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
+          dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
+          Math.random()<0.6?dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0],'g'):dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
+          dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0],'g'),
+        ];
+      } else if(currency==='p'){
+        const attrs = shuffle(ATTR_KEYS.slice()).slice(0,2);
+        const timePrice = Math.round(DUNGEON_CFG.timeBuyPriceBase*Math.pow(DUNGEON_CFG.timeBuyCountCoeff,D.timeBuyCount)*Math.pow(DUNGEON_CFG.timeBuyStageCoeff,Math.floor((typeof S!=='undefined'?S.stageIdx:0)/3)));
+        newCards = [dungeonItemCardHTML({id:'buytime',name:'购买时间',nameEn:'Buy Time +10s',price:timePrice},'p'),dungeonAttrCardHTML(attrs[0],'p'),dungeonAttrCardHTML(attrs[1],'p')];
+      } else if(currency==='t'){
+        const goldPrice = Math.round(DUNGEON_CFG.goldBuyPriceBase*Math.pow(DUNGEON_CFG.goldBuyCountCoeff,D.goldBuyCount));
+        const attrs = shuffle(ATTR_KEYS.slice()).slice(0,1);
+        newCards = [dungeonItemCardHTML({id:'buygold',name:'购买金币',nameEn:'Buy Gold +3',price:goldPrice},'t'),dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0],'t'),dungeonAttrCardHTML(attrs[0],'t')];
+      }
+      grid.innerHTML = newCards.join('');
+      dungeonBindCardClicks(section, currency);
+      dungeonUpdateDisabledState();
+    }, 120);
+  });
+}
+
+// 实时更新商店内所有卡片和刷新按钮的可购买颜色状态
+function dungeonUpdateDisabledState(){
+  const area = document.getElementById('dungeonShopArea');
+  if(!area) return;
+  // 卡片：费用数字红/正常
+  area.querySelectorAll('.dcard:not(.dcard-bought)').forEach(card=>{
+    const price = parseInt(card.dataset.price);
+    const cur   = card.dataset.cur;
+    const numEl = card.querySelector('.dcard-cost-num');
+    if(!numEl || !price || !cur) return;
+    if(dungeonCanAfford(price, cur)){
+      numEl.classList.remove('unaffordable');
+    } else {
+      numEl.classList.add('unaffordable');
+    }
+  });
+  // 刷新按钮：文字红/正常
+  area.querySelectorAll('.dshop-reroll[data-price]').forEach(btn=>{
+    const price = parseInt(btn.dataset.price);
+    const cur   = btn.dataset.cur;
+    if(!price || !cur) return;
+    if(dungeonCanAfford(price, cur)){
+      btn.classList.remove('unaffordable');
+    } else {
+      btn.classList.add('unaffordable');
+    }
+  });
+}
+
+// 沉闷音效（低频短促，模拟"无法操作"）
+function dungeonPlayDullSound(){
+  if(typeof playSound!=='function') return;
+  playSound(90, 0.12, 0.45);
+}
+
 // 绑定卡片点击购买
 function dungeonBindCardClicks(section, currency){
   section.querySelectorAll('.dcard').forEach(card=>{
@@ -596,11 +681,7 @@ function dungeonBindCardClicks(section, currency){
       const price = parseInt(card.dataset.price);
       const cur   = card.dataset.cur;
       if(!dungeonCanAfford(price, cur)) {
-        // 抖动效果
-        card.classList.remove('dcard-shake');
-        void card.offsetWidth;
-        card.classList.add('dcard-shake');
-        card.addEventListener('animationend', ()=>card.classList.remove('dcard-shake'), {once:true});
+        dungeonPlayDullSound();
         return;
       }
       dungeonDeductCost(price, cur);
@@ -615,6 +696,8 @@ function dungeonBindCardClicks(section, currency){
         dungeonApplyItemEffect(card.dataset.item);
         dungeonRenderStateArea();
       }
+      // 购买后重新评估所有卡片可购买状态
+      dungeonUpdateDisabledState();
     });
   });
 }
@@ -757,46 +840,10 @@ function dungeonHideUI(){
   });
 }
 
-// ===== 卡片3D悬浮拨动交互 =====
+// ===== 卡片交互（野兽派 CSS hover 接管，JS层保留空函数兼容调用） =====
 function dungeonApplyCardTilt(container){
-  const MAX_TILT = 14;
-
-  function applyTilt(card, cx, cy){
-    const rect = card.getBoundingClientRect();
-    const x = (cx - rect.left) / rect.width  - 0.5;
-    const y = (cy - rect.top)  / rect.height - 0.5;
-    card.style.transition = 'box-shadow 0.25s, border-color 0.15s';
-    card.style.transform = `perspective(600px) rotateX(${-y*MAX_TILT}deg) rotateY(${x*MAX_TILT}deg) translateY(-4px) scale(1.02)`;
-  }
-
-  function resetTilt(card){
-    card.style.transition = 'transform 0.3s ease, box-shadow 0.25s, border-color 0.15s';
-    card.style.transform = 'perspective(600px) translateY(-2px)';
-  }
-
-  // 鼠标移动时倾斜
-  container.addEventListener('mousemove', e=>{
-    const card = e.target.closest('.dcard:not(.dcard-bought)');
-    if(!card) return;
-    applyTilt(card, e.clientX, e.clientY);
-  });
-
-  // 鼠标离开时复位（委托到每张卡片）
-  container.addEventListener('mouseleave', e=>{
-    const card = e.target.closest?.('.dcard:not(.dcard-bought)');
-    if(card) resetTilt(card);
-  }, true);
-
-  // 触摸滑动倾斜
-  container.addEventListener('touchmove', e=>{
-    const t = e.touches[0];
-    const card = document.elementFromPoint(t.clientX, t.clientY)?.closest('.dcard:not(.dcard-bought)');
-    if(card) applyTilt(card, t.clientX, t.clientY);
-  }, {passive:true});
-
-  container.addEventListener('touchend', ()=>{
-    container.querySelectorAll('.dcard:not(.dcard-bought)').forEach(c=>resetTilt(c));
-  }, {passive:true});
+  // 野兽派风格：hover 位移由 CSS .dcard:hover { transform:translate(4px,4px) } 控制
+  // JS tilt 已移除
 }
 const style = document.createElement('style');
 style.textContent = `
@@ -819,48 +866,71 @@ style.textContent = `
 .dungeon-shop-area::-webkit-scrollbar-track { background:transparent; }
 .dungeon-shop-area::-webkit-scrollbar-thumb { background:transparent;border-radius:4px; }
 .dungeon-shop-area:hover::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.2); }
+
+/* ===== 商店 Header ===== */
 .dshop-header {
   width:100%;max-width:600px;
   display:flex;justify-content:center;align-items:center;
-  margin-bottom:12px;
+  margin-bottom:14px;
 }
-.dshop-title { font-size:18px;font-weight:bold;color:#333; }
+.dshop-title {
+  font-size:20px;font-weight:900;color:#111;
+  text-transform:uppercase;letter-spacing:0.08em;
+  border-bottom:4px solid #111;padding-bottom:2px;
+}
 
+/* ===== 交易区块 ===== */
 .dshop-section {
   width:100%;max-width:600px;
-  border-radius:12px;padding:12px;margin-bottom:10px;
-  border:2px solid #ddd;
+  border-radius:0;padding:12px;margin-bottom:10px;
+  border:3px solid #111;
   background:#fff;
 }
-.dshop-section-g { border-color:#ffc107; }
-.dshop-section-p { border-color:#64b5f6; }
-.dshop-section-t { border-color:#81c784; }
-.dshop-section-c { border-color:#ce93d8; }
+.dshop-section-g { background:#fffbe6; }
+.dshop-section-p { background:#e8f4fd; }
+.dshop-section-t { background:#e8f7e8; }
+.dshop-section-c { background:#f9f0fc; }
 
 .dshop-section-header {
   display:flex;align-items:center;gap:8px;margin-bottom:10px;
   justify-content:space-between;
 }
 .dshop-section-icon {
-  width:26px;height:26px;border-radius:50%;
+  width:26px;height:26px;border-radius:0;
   display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:bold;
+  font-size:13px;font-weight:900;
+  border:2px solid #111;
 }
-.dshop-icon-g { background:#ffc107;color:#fff; }
+.dshop-icon-g { background:#ffc107;color:#111; }
 .dshop-icon-p { background:#2178d2;color:#fff; }
 .dshop-icon-t { background:#4caf50;color:#fff; }
 .dshop-icon-c { background:#9c27b0;color:#fff; }
-.dshop-section-label { font-size:14px;font-weight:bold;color:#333; }
-.dshop-reroll {
-  padding:4px 10px;border-radius:8px;border:1.5px solid #ddd;
-  background:#f8f8f8;color:#666;font-size:12px;font-weight:bold;
-  cursor:pointer;transition:all 0.2s;
-}
-.dshop-reroll:hover { border-color:#999;color:#333; }
-.dshop-reroll-g { border-color:#ffc107;color:#b8860b; }
-.dshop-reroll-p { border-color:#64b5f6;color:#2178d2; }
-.dshop-reroll-t { border-color:#81c784;color:#388e3c; }
+.dshop-section-label { font-size:14px;font-weight:900;color:#111;text-transform:uppercase;letter-spacing:0.05em; }
 
+.dshop-reroll {
+  padding:4px 10px;border-radius:0;
+  border:2px solid #111;
+  background:#fff;color:#111;font-size:12px;font-weight:900;
+  cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;
+  box-shadow:3px 3px 0px 0px #111;
+}
+.dshop-reroll:hover {
+  box-shadow:2px 2px 0px 0px #111;
+  transform:translate(1px,1px);
+}
+.dshop-reroll:active {
+  box-shadow:2px 2px 0px 0px #111;
+  transform:translate(2px,2px);
+}
+.dshop-reroll.full-press {
+  box-shadow:none !important;
+  transform:translate(3px,3px) !important;
+}
+.dshop-reroll-g { background:#ffc107; }
+.dshop-reroll-p { background:#64b5f6; }
+.dshop-reroll-t { background:#81c784; }
+
+/* ===== 卡片网格 ===== */
 .dshop-grid {
   display:grid;gap:8px;
 }
@@ -868,44 +938,34 @@ style.textContent = `
 .dshop-grid-3 { grid-template-columns:repeat(3,1fr); }
 .dshop-grid-2 { grid-template-columns:repeat(2,1fr); }
 
-.dshop-slot {
-  min-height:90px;
-  border:2px solid #e0e0e0;border-radius:10px;
-  background:#fafafa;
-  cursor:pointer;transition:all 0.2s;
-}
-.dshop-slot:hover { border-color:#999; }
-
 /* ===== 商品卡片 ===== */
 .dcard {
-  border:2px solid #e0e0e0;border-radius:10px;
+  border:3px solid #111;border-radius:0;
   background:#fff;overflow:hidden;
   cursor:pointer;
   display:flex;flex-direction:column;
   min-height:90px;
   user-select:none;
-  transform: perspective(600px) translateY(-2px);
-  box-shadow: 0 3px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
-  transition: box-shadow 0.25s, transform 0.15s, border-color 0.15s;
-  will-change: transform;
+  box-shadow:4px 4px 0px 0px #111;
+  transition:box-shadow 0.15s, transform 0.15s;
+  will-change:transform;
 }
-.dcard:hover { border-color:#bbb; box-shadow:0 5px 14px rgba(0,0,0,0.11), 0 2px 5px rgba(0,0,0,0.07); }
+.dcard:hover {
+  box-shadow:3px 3px 0px 0px #111;
+  transform:translate(1px,1px);
+}
+.dcard:active {
+  box-shadow:3px 3px 0px 0px #111;
+  transform:translate(2px,2px);
+}
 .dcard.dcard-bought {
   opacity:0.4;pointer-events:none;
-  transform:perspective(600px) translateY(3px) !important;
-  box-shadow:none !important;
-  filter:grayscale(0.3);
-}
-.dcard.dcard-shake { animation:dcardShake 0.35s ease; }
-@keyframes dcardShake {
-  0%,100% { transform:perspective(600px) translateY(-2px) translateX(0); }
-  20%      { transform:perspective(600px) translateY(-2px) translateX(-6px); }
-  40%      { transform:perspective(600px) translateY(-2px) translateX(6px); }
-  60%      { transform:perspective(600px) translateY(-2px) translateX(-4px); }
-  80%      { transform:perspective(600px) translateY(-2px) translateX(4px); }
+  transform:translate(4px,4px);
+  box-shadow:none;
+  filter:grayscale(0.6);
 }
 
-/* ---- 属性升级卡 ---- */
+/* ---- 属性升级卡体 ---- */
 .dcard-body {
   flex:1;padding:7px 8px 4px;
   display:flex;flex-direction:column;justify-content:space-between;
@@ -913,8 +973,8 @@ style.textContent = `
 .dcard-row-top {
   display:flex;justify-content:space-between;align-items:flex-start;
 }
-.dcard-cn  { font-size:15px;font-weight:bold;color:#222;line-height:1.2; }
-.dcard-en  { font-size:10px;color:#888;line-height:1.2;text-align:right; }
+.dcard-cn  { font-size:15px;font-weight:900;color:#111;line-height:1.2;text-transform:uppercase; }
+.dcard-en  { font-size:10px;color:#555;line-height:1.2;text-align:right;font-weight:700; }
 .dcard-row-lv {
   display:flex;align-items:flex-end;gap:0;
   margin-top:2px;
@@ -922,87 +982,97 @@ style.textContent = `
 .dcard-lv-cur  { font-size:13px;font-weight:900;color:#555;line-height:1; }
 .dcard-arrow {
   flex:1;min-width:14px;height:20px;
-  background:#f9a825;
+  background:#ffc107;
   clip-path:polygon(0% 100%, 100% 0%, 100% 100%);
   margin:0 4px;align-self:flex-end;
+  border:none;
 }
 .dcard-lv-next { font-size:28px;font-weight:900;color:#111;line-height:1; }
 
-/* ---- 道具卡 ---- */
+/* ---- 道具卡体 ---- */
 .dcard-body-item {
   flex-direction:row !important;align-items:stretch;padding:7px 8px 4px;
 }
 .dcard-item-text { flex:1;display:flex;flex-direction:column;justify-content:space-between; }
-.dcard-item-en   { font-size:10px;color:#666;line-height:1.3; }
-.dcard-item-cn   { font-size:16px;font-weight:bold;color:#111;line-height:1.2; }
+.dcard-item-en   { font-size:10px;color:#555;line-height:1.3;font-weight:700; }
+.dcard-item-cn   { font-size:16px;font-weight:900;color:#111;line-height:1.2; }
 .dcard-item-icon {
   width:34px;height:34px;align-self:center;flex-shrink:0;
-  background:#ddd;border-radius:6px;margin-left:6px;
+  background:#f0f0f0;border-radius:0;
+  border:2px solid #111;
+  margin-left:6px;
 }
 
 /* ---- 费用条 ---- */
 .dcard-cost {
   display:flex;align-items:center;justify-content:flex-end;gap:6px;
   padding:5px 10px;
-  border:2px solid #e0e0e0;border-radius:0 0 8px 8px;
-  border-top:none;background:#fafafa;font-weight:bold;
+  border-top:3px solid #111;
+  background:#f0f0f0;
+  font-weight:900;
 }
-.dcard-cost-num { font-size:15px;color:#333; }
+.dcard-cost-num { font-size:15px;color:#111;transition:color 0.15s; }
+.dcard-cost-num.unaffordable { color:#e53935; }
+/* 刷新按钮不可负担时数字红色 */
+.dshop-reroll.unaffordable { color:#e53935 !important; }
 .dcard-cost-unit { font-size:15px; }
-/* zone colors */
-.dcard-cost-g { border-color:#ffc107; background:#fff3cd; }
-.dcard-cost-g .dcard-cost-unit { color:#b8860b; }
-.dcard-cost-p { border-color:#64b5f6; background:#e0f0fd; }
-.dcard-cost-p .dcard-cost-unit { color:#2178d2; }
-.dcard-cost-t { border-color:#81c784; background:#e6f4e6; }
-.dcard-cost-t .dcard-cost-unit { color:#388e3c; }
-.dcard-cost-c { border-color:#ce93d8; background:#f5e9f7; }
+.dcard-cost-g { background:#fff3cd;border-top-color:#111; }
+.dcard-cost-g .dcard-cost-unit { color:#7a5900; }
+.dcard-cost-p { background:#dceefb;border-top-color:#111; }
+.dcard-cost-p .dcard-cost-unit { color:#0d47a1; }
+.dcard-cost-t { background:#d9f2d9;border-top-color:#111; }
+.dcard-cost-t .dcard-cost-unit { color:#1b5e20; }
+.dcard-cost-c { background:#f3e5f5;border-top-color:#111; }
+.dcard-cost-c .dcard-cost-unit { color:#4a148c; }
 
 /* ---- 诅咒组合卡 ---- */
 .dcard-body-curse {
-  position:relative;
-  display:block;
-  padding:0;
-  overflow:hidden;
-  flex:1;
-  min-height:68px;
+  position:relative;display:block;
+  padding:0;overflow:hidden;
+  flex:1;min-height:68px;
 }
 .dcurse-half {
-  position:absolute;
-  top:0;left:0;width:100%;height:100%;
+  position:absolute;top:0;left:0;width:100%;height:100%;
   padding:6px 8px;
   display:flex;flex-direction:column;justify-content:space-between;
 }
-/* 左上→右下 斜切：左侧道具区 */
 .dcurse-item-half {
   clip-path:polygon(0% 0%, 62% 0%, 38% 100%, 0% 100%);
-  background:#fff;
-  align-items:flex-start;
+  background:#fff;align-items:flex-start;
 }
-/* 右上→左下 斜切：右侧诅咒区 */
 .dcurse-curse-half {
   clip-path:polygon(62% 0%, 100% 0%, 100% 100%, 38% 100%);
-  background:#f5e9f7;
-  align-items:flex-end;
-  text-align:right;
+  background:#f3e5f5;align-items:flex-end;text-align:right;
 }
-.dcurse-item-en  { font-size:10px;color:#666;line-height:1.2;max-width:55%; }
-.dcurse-item-cn  { font-size:15px;font-weight:bold;color:#111;line-height:1.2;max-width:55%; }
-.dcurse-curse-cn { font-size:15px;font-weight:bold;color:#7b1fa2;line-height:1.2;max-width:55%; }
-.dcurse-curse-en { font-size:10px;color:#9c27b0;line-height:1.2;max-width:55%; }
+.dcurse-item-en  { font-size:10px;color:#555;line-height:1.2;max-width:55%;font-weight:700; }
+.dcurse-item-cn  { font-size:15px;font-weight:900;color:#111;line-height:1.2;max-width:55%; }
+.dcurse-curse-cn { font-size:15px;font-weight:900;color:#4a148c;line-height:1.2;max-width:55%; }
+.dcurse-curse-en { font-size:10px;color:#7b1fa2;line-height:1.2;max-width:55%;font-weight:700; }
 .dcurse-icon {
   width:28px;height:28px;
-  border-radius:5px;background:#ddd;flex-shrink:0;
+  border-radius:0;background:#e0e0e0;flex-shrink:0;
+  border:2px solid #111;
 }
 
-.dshop-footer { margin-top:12px;text-align:center; }
+/* ===== 继续按钮 ===== */
+.dshop-footer { margin-top:14px;text-align:center; }
 .dshop-continue {
-  padding:10px 30px;font-size:15px;border:none;border-radius:20px;
-  color:#fff;cursor:pointer;font-weight:bold;
-  background:linear-gradient(145deg,#4a9e8e,#2d7a6e);
-  transition:transform 0.15s;
+  padding:10px 32px;font-size:15px;
+  border:3px solid #111;border-radius:0;
+  color:#111;cursor:pointer;font-weight:900;
+  background:#ffc107;
+  text-transform:uppercase;letter-spacing:0.06em;
+  box-shadow:5px 5px 0px 0px #111;
+  transition:box-shadow 0.15s,transform 0.15s;
 }
-.dshop-continue:hover { transform:scale(1.05); }
+.dshop-continue:hover {
+  box-shadow:4px 4px 0px 0px #111;
+  transform:translate(1px,1px);
+}
+.dshop-continue:active {
+  box-shadow:none;
+  transform:translate(5px,5px);
+}
 `;
 document.head.appendChild(style);
 
