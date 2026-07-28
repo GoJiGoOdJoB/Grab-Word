@@ -712,8 +712,15 @@ function dungeonCanAfford(price, cur){
 
 function dungeonDeductCost(price, cur){
   if(cur==='G') D.gold-=price, dungeonRenderGoldUI();
-  if(cur==='P') S.totalScore=Math.max(0,S.totalScore-price);
-  if(cur==='T') S.timeLeft=Math.max(0,S.timeLeft-price);
+  if(cur==='P'){
+    S.totalScore=Math.max(0,S.totalScore-price);
+    const box=document.getElementById('soloScoreBox');
+    if(box) box.innerHTML=S.totalScore+' <span style="font-size:0.6em">P</span>';
+  }
+  if(cur==='T'){
+    S.timeLeft=Math.max(0,S.timeLeft-price);
+    if(typeof soloUpdateTimerBar==='function') soloUpdateTimerBar();
+  }
 }
 
 function dungeonApplyItemEffect(itemId){
@@ -787,9 +794,13 @@ function dungeonRenderStressBar(){
   if(!el){
     el = document.createElement('div');
     el.id = 'dungeonStressBar';
-    el.style.cssText = 'width:90%;max-width:320px;height:8px;background:#333;border-radius:4px;margin:6px auto 0;position:relative;overflow:hidden;';
-    el.innerHTML = '<div id="dungeonStressFill" style="height:100%;background:linear-gradient(90deg,#7b1fa2,#e040fb);width:0;transition:width 0.3s;border-radius:4px;"></div>';
-    // Insert after pass button
+    el.style.cssText = 'width:100%;max-width:600px;display:flex;align-items:center;gap:0;margin:4px auto 0;';
+    el.innerHTML = `
+      <span id="dungeonStressLabel" style="font-size:11px;font-weight:900;color:#400060;letter-spacing:0.08em;white-space:nowrap;padding:0 6px 0 0;flex-shrink:0;">STRESS</span>
+      <div id="dungeonStressTrack" style="flex:1;height:18px;background:#e0e0e0;border:2px solid #400060;border-radius:0;overflow:hidden;position:relative;">
+        <div id="dungeonStressFill" style="height:100%;background:#9c27b0;width:0%;transition:width 0.3s;border-radius:0;"></div>
+      </div>
+    `;
     const passBtn = document.querySelector('#soloPanel .pass-btn');
     if(passBtn && passBtn.parentNode){
       passBtn.parentNode.insertBefore(el, passBtn.nextSibling);
@@ -804,29 +815,33 @@ function dungeonRenderStressBar(){
 }
 
 function dungeonRenderStateArea(){
-  // Replace wordbook with state area in dungeon mode
   const book = document.getElementById('soloBook');
   if(!book || !D.active) return;
-  let html = '<div style="font-size:11px;color:#999;margin-bottom:4px;">状态 (STATE)</div>';
+  // 单词簿同款风格：纯文本标签，居左，无背景，无圆角
+  let html = '<div style="font-size:10px;color:#999;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">STATE</div>';
   // Attributes
-  html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">';
-  ATTR_KEYS.forEach(k=>{
-    if(D.attrs[k]>0) html += `<span style="padding:2px 6px;background:rgba(33,120,210,0.1);border-radius:4px;font-size:11px;color:#2178d2;">${ATTR_NAMES[k]} ${D.attrs[k]}</span>`;
-  });
-  html += '</div>';
+  const attrEntries = ATTR_KEYS.filter(k=>D.attrs[k]>0);
+  if(attrEntries.length>0){
+    html += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px;margin-bottom:4px;">';
+    attrEntries.forEach(k=>{
+      html += `<span style="font-size:12px;font-weight:900;color:#0d3172;">${ATTR_NAMES[k]}&thinsp;${D.attrs[k]}</span>`;
+    });
+    html += '</div>';
+  }
   // Curses
-  if(Object.keys(D.curses).length>0){
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">';
-    Object.entries(D.curses).forEach(([k,lv])=>{
-      if(lv>0) html += `<span style="padding:2px 6px;background:rgba(156,39,176,0.1);border-radius:4px;font-size:11px;color:#9c27b0;">${CURSE_DEFS[k]?.name||k} Lv.${lv}</span>`;
+  const curseEntries = Object.entries(D.curses).filter(([,lv])=>lv>0);
+  if(curseEntries.length>0){
+    html += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px;margin-bottom:4px;">';
+    curseEntries.forEach(([k,lv])=>{
+      html += `<span style="font-size:12px;font-weight:900;color:#400060;">${CURSE_DEFS[k]?.name||k}&thinsp;Lv.${lv}</span>`;
     });
     html += '</div>';
   }
   // Items
   if(D.items.length>0){
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px;">';
     D.items.forEach(it=>{
-      html += `<span style="padding:2px 6px;background:rgba(76,175,80,0.1);border-radius:4px;font-size:11px;color:#4caf50;">${it.id}</span>`;
+      html += `<span style="font-size:12px;font-weight:900;color:#1b4d28;">${it.id}</span>`;
     });
     html += '</div>';
   }

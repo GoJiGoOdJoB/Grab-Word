@@ -929,6 +929,328 @@ body.uppercase-mode .card { text-transform: uppercase; }
   .solo-score-box { font-size: 26px; }
   .book-section, .solo-book-section { min-height: 30px; padding: 4px 6px; }
 }
+/* ============================================================
+   NEO-BRUTALIST PLAYFUL — 全局风格覆盖层
+   规则：零圆角 · 硬偏移阴影 · 描边=阴影色 · font-weight:900 on interactive
+   ============================================================ */
+
+/* ── 全局字体 ── */
+body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; background:#f5f5f5; }
+
+/* ── 开始/结算覆盖层 ── */
+.overlay { background: rgba(245,245,245,0.96); }
+
+/* ── 游戏标题 ── */
+.start-title {
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: unset !important;
+  color: #111;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+/* ── 通用按钮 ── */
+.btn {
+  border-radius: 0;
+  border: 3px solid #111;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.btn-start {
+  background: #2178d2;
+  box-shadow: 4px 4px 0 0 #0d3172;
+}
+.btn-exit {
+  background: #e53935;
+  box-shadow: 4px 4px 0 0 #7a0000;
+}
+.btn:hover { transform: translate(1px,1px); }
+.btn-start:hover { box-shadow: 3px 3px 0 0 #0d3172; }
+.btn-exit:hover  { box-shadow: 3px 3px 0 0 #7a0000; }
+.btn:active { transform: translate(4px,4px) !important; box-shadow: none !important; }
+
+/* ── 模式选择按钮 ── */
+.mode-btn {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  font-weight: 900;
+  box-shadow: 3px 3px 0 0 #3a3a3a;
+  transition: box-shadow 0.12s, transform 0.12s;
+  color: #333;
+}
+.mode-btn:hover { border-color: #3a3a3a; color: #111; box-shadow: 2px 2px 0 0 #3a3a3a; transform: translate(1px,1px); }
+.mode-btn:active { box-shadow: none !important; transform: translate(3px,3px) !important; }
+.mode-btn.selected {
+  background: #2178d2; color: #fff;
+  border-color: #0d3172;
+  box-shadow: 3px 3px 0 0 #0d3172;
+}
+.mode-btn.selected:hover { box-shadow: 2px 2px 0 0 #0d3172; transform: translate(1px,1px); }
+
+/* ── 难度/子模式按钮 ── */
+.diff-btn, .solo-submode-btn, .solo-diff-trigger {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  font-weight: 900;
+  box-shadow: 3px 3px 0 0 #3a3a3a;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.diff-btn:hover, .solo-submode-btn:hover, .solo-diff-trigger:hover {
+  box-shadow: 2px 2px 0 0 #3a3a3a; transform: translate(1px,1px);
+}
+.diff-btn:active, .solo-submode-btn:active, .solo-diff-trigger:active {
+  box-shadow: none !important; transform: translate(3px,3px) !important;
+}
+.diff-btn.selected, .solo-submode-btn.selected {
+  border-color: #0d3172; background: #2178d2; color: #fff;
+  box-shadow: 3px 3px 0 0 #0d3172;
+}
+.solo-diff-trigger.active { border-color: #0d3172; color: #0d3172; }
+.solo-submode-lock-overlay { border-radius: 0 !important; }
+.submode-lock-overlay { border-radius: 0 !important; }
+
+/* ── 难度下拉弹窗 ── */
+.solo-diff-popup {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  box-shadow: none;
+}
+.solo-diff-option {
+  border-radius: 0;
+  font-weight: 900;
+}
+
+/* ── 规则按钮 ── */
+.btn-rules {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  font-weight: 700;
+  box-shadow: 2px 2px 0 0 #3a3a3a;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.btn-rules:hover { box-shadow: none; transform: translate(2px,2px); border-color: #3a3a3a; color: #111; }
+
+/* ── 规则弹窗 ── */
+.rules-modal {
+  border-radius: 0;
+  border: 3px solid #111;
+  box-shadow: 6px 6px 0 0 #111;
+}
+.rules-title { font-weight: 900; text-transform: uppercase; }
+
+/* ── 计时器组（PvP） ── */
+.timer-group {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  box-shadow: 3px 3px 0 0 #3a3a3a;
+}
+
+/* ── 时间条圆角 ── */
+.solo-timer-bar-wrap { border-radius: 0 !important; }
+
+/* ── 得分条 ── */
+.score-bar {
+  border-radius: 0;
+  background: linear-gradient(to right, #2178d2 0%, #ddd 50%, #d4a800 100%);
+  border: 2px solid #3a3a3a;
+}
+.score-point {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  box-shadow: 2px 2px 0 0 #3a3a3a;
+  font-weight: 900;
+}
+.settlement-bar { border-radius: 0; box-shadow: 3px 3px 0 0 #3a3a3a; border: 2px solid #3a3a3a; }
+.settlement-point { border-radius: 0; box-shadow: none; }
+
+/* ── 词语区 ── */
+.word-section {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  box-shadow: 3px 3px 0 0 #3a3a3a;
+  background: #fff;
+}
+.solo-word-section {
+  border-radius: 0 !important;
+  border: 2px solid #3a3a3a !important;
+  box-shadow: 3px 3px 0 0 #3a3a3a !important;
+}
+.word-section.shiny, .solo-word-section.shiny {
+  background: #f3e5f5 !important;
+  animation: none !important;
+  border-color: #400060 !important;
+  box-shadow: 3px 3px 0 0 #400060 !important;
+}
+.letter-slot { border-radius: 0; }
+.letter-slot.next-slot { border-color: #2178d2; }
+
+/* ── 手牌卡片 ── */
+.card {
+  border-radius: 0;
+  font-weight: 900;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.split.left .card {
+  border: 2px solid #0d3172;
+  box-shadow: 3px 3px 0 0 #0d3172;
+}
+.split.right .card {
+  border: 2px solid #7a4f00;
+  box-shadow: 3px 3px 0 0 #7a4f00;
+}
+.solo-cards-section .card {
+  border: 2px solid #0d3172;
+  box-shadow: 3px 3px 0 0 #0d3172;
+}
+.card:hover {
+  transform: translate(1px,1px) !important;
+}
+.split.left .card:hover  { box-shadow: 2px 2px 0 0 #0d3172; }
+.split.right .card:hover { box-shadow: 2px 2px 0 0 #7a4f00; }
+.solo-cards-section .card:hover { box-shadow: 2px 2px 0 0 #0d3172; }
+.card:active { transform: translate(3px,3px) !important; }
+.split.left .card:active  { box-shadow: none !important; }
+.split.right .card:active { box-shadow: none !important; }
+.solo-cards-section .card:active { box-shadow: none !important; }
+
+/* ── PASS 按钮 ── */
+.pass-btn {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  font-weight: 900;
+  box-shadow: 2px 2px 0 0 #3a3a3a;
+  transition: box-shadow 0.12s, transform 0.12s;
+  background: #f5f5f5; color: #555;
+}
+.pass-btn:hover { box-shadow: 1px 1px 0 0 #3a3a3a; transform: translate(1px,1px); background: #f0f0f0; }
+.pass-btn:active { box-shadow: none !important; transform: translate(2px,2px) !important; }
+.pass-btn.active { background: #fbe9e7; border-color: #7a0000; box-shadow: 2px 2px 0 0 #7a0000; color: #e53935; }
+
+/* ── 单词簿/书 ── */
+.book-section, .solo-book-section {
+  border-radius: 0;
+  border: 2px solid #111;
+}
+.wordbook-item { border-radius: 0 !important; border: none !important; }
+
+/* ── 暂停按钮 ── */
+.pause-btn, .pvp-pause-btn, .solo-pause-btn {
+  border-radius: 0 !important;
+  border: 2px solid #3a3a3a !important;
+  font-weight: 900 !important;
+  box-shadow: 3px 3px 0 0 #3a3a3a !important;
+  transition: box-shadow 0.12s, transform 0.12s !important;
+  background: #fff;
+}
+/* pause-btn 绝对居中，hover 需合并位移与居中 transform */
+.pause-btn:hover {
+  box-shadow: 1px 1px 0 0 #3a3a3a !important;
+  transform: translate(calc(-50% + 1px), calc(-50% + 1px)) !important;
+  background: #f0f0f0 !important;
+}
+/* pvp-pause-btn 不用居中 transform */
+.pvp-pause-btn:hover {
+  box-shadow: 1px 1px 0 0 #3a3a3a !important;
+  transform: translate(1px,1px) !important;
+  background: #f0f0f0 !important;
+}
+.solo-pause-btn:hover { box-shadow: 1px 1px 0 0 #3a3a3a !important; transform: translate(1px,1px) !important; background: #f0f0f0 !important; }
+.pause-btn:active, .pvp-pause-btn:active { box-shadow: none !important; }
+
+/* ── 生命条 ── */
+.solo-life-bar { border-radius: 0; border: 2px solid #1b4d28; }
+.solo-life-dot { border-radius: 0; }
+
+/* ── 段位标签 ── */
+.solo-stage-tag {
+  border-radius: 0;
+  background: #e8f4fd;
+  border: 2px solid #0d3172;
+  color: #0d3172;
+  font-weight: 900;
+  padding: 3px 10px;
+}
+
+/* ── 段位积分条 ── */
+.solo-promo-bar { border-radius: 0; border: 2px solid #3a3a3a; height: 18px !important; }
+.solo-promo-fill { border-radius: 0; }
+
+/* ── 词语计时条 ── */
+.solo-word-timer { border-radius: 0; border: 2px solid #3a3a3a; }
+.solo-word-timer-fill { border-radius: 0; }
+.solo-word-timer-ghost { border-radius: 0; }
+
+/* ── 设置弹窗 ── */
+.settings-modal {
+  border-radius: 0;
+  border: 3px solid #3a7bd5;
+  box-shadow: none;
+}
+.settings-tab.active { border-radius: 0; }
+.settings-save {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  font-weight: 900;
+  box-shadow: 2px 2px 0 0 #3a3a3a;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.settings-save:hover { box-shadow: 1px 1px 0 0 #3a3a3a; transform: translate(1px,1px); background: #f5f5f5; }
+.settings-save:active { box-shadow: none !important; transform: translate(2px,2px) !important; }
+.settings-lib-btn {
+  border-radius: 0; font-weight: 900;
+  border: 2px solid #0d3172;
+  box-shadow: 2px 2px 0 0 #0d3172;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.settings-lib-btn:hover { background: #2a5fa8; box-shadow: 1px 1px 0 0 #0d3172; transform: translate(1px,1px); }
+.settings-lib-btn:active { box-shadow: none !important; transform: translate(2px,2px) !important; }
+.settings-lib-del {
+  border-radius: 0; font-weight: 900;
+  border: 2px solid #7a0000;
+  box-shadow: 2px 2px 0 0 #7a0000;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.settings-lib-del:hover { background: #c62828; box-shadow: 1px 1px 0 0 #7a0000; transform: translate(1px,1px); }
+.settings-lib-del:active { box-shadow: none !important; transform: translate(2px,2px) !important; }
+.settings-del-btn { border-radius: 0; font-weight: 900; }
+
+/* ── 工具角落按钮 ── */
+.case-toggle, .settings-btn {
+  border-radius: 0;
+  border: 2px solid #3a3a3a;
+  box-shadow: 2px 2px 0 0 #3a3a3a;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.case-toggle:hover, .settings-btn:hover {
+  box-shadow: 1px 1px 0 0 #3a3a3a;
+  transform: translate(1px,1px);
+}
+
+/* ── 对局面板 ── */
+.split.left { background: #e8f4fd; border-right: 1px solid #e0e0e0; }
+.split.right { background: #fffbe6; border-left: 1px solid #e0e0e0; }
+
+/* ── 记分卡 ── */
+.score-card {
+  border-radius: 0;
+  border: 2px solid #0d3172;
+  box-shadow: 4px 4px 0 0 #0d3172;
+  transition: box-shadow 0.12s, transform 0.12s;
+}
+.score-card:hover { transform: translate(1px,1px); box-shadow: 3px 3px 0 0 #0d3172; }
+.sc-stats .sc-icon-sq { border-radius: 0; }
+.sc-stats .sc-icon-circle { border-radius: 0; }
+
+/* ── 提示框 ── */
+.solo-toast { border-radius: 0; border: 2px solid #fff; font-weight: 900; }
+/* 右上角分数浮动提示 — 隐藏 */
+#soloStatus { display: none !important; }
+
+/* ── 连击框 ── */
+.combo-box { border-radius: 0; }
 </style>
 <script>
 document.addEventListener('touchstart',function(){},true);
@@ -2877,14 +3199,8 @@ function soloCheckComplete(){
     S.burstCounter=0;S.burstQualities=[];
   }
 
-  // build status lines
-  const statusEl=document.getElementById('soloStatus');
-  const shinyTag=S.isShiny?'✦ ':'';
-  let lines=[];
-  lines.push(`${shinyTag}+${earnedPts}`);
-  if(comboBonus>0)lines.push(`+${comboBonus} (连击)`);
-  if(burstBonus>0)lines.push(`+${burstBonus} (${burstPerfect?'完美连击爆发':'连击爆发'})`);
-  statusEl.innerHTML=lines.join('<br>');
+  // clear score status display
+  document.getElementById('soloStatus').textContent='';
   soloUpdateCombo();
   soloUpdateStageUI();
   soloAddWordBook(quality);
