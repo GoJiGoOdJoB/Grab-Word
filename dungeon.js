@@ -886,10 +886,10 @@ style.textContent = `
   border:3px solid #111;
   background:#fff;
 }
-.dshop-section-g { background:#fffbe6; }
-.dshop-section-p { background:#e8f4fd; }
-.dshop-section-t { background:#e8f7e8; }
-.dshop-section-c { background:#f9f0fc; }
+.dshop-section-g { background:#fffbe6; border-color:#6b4500; }
+.dshop-section-p { background:#e8f4fd; border-color:#0d3172; }
+.dshop-section-t { background:#e8f7e8; border-color:#1b4d28; }
+.dshop-section-c { background:#f9f0fc; border-color:#400060; }
 
 .dshop-section-header {
   display:flex;align-items:center;gap:8px;margin-bottom:10px;
@@ -899,8 +899,12 @@ style.textContent = `
   width:26px;height:26px;border-radius:0;
   display:flex;align-items:center;justify-content:center;
   font-size:13px;font-weight:900;
-  border:2px solid #111;
+  border:2px solid #3a3a3a;
 }
+.dshop-section-g .dshop-section-icon { border-color:#6b4500; }
+.dshop-section-p .dshop-section-icon { border-color:#0d3172; }
+.dshop-section-t .dshop-section-icon { border-color:#1b4d28; }
+.dshop-section-c .dshop-section-icon { border-color:#400060; }
 .dshop-icon-g { background:#ffc107;color:#111; }
 .dshop-icon-p { background:#2178d2;color:#fff; }
 .dshop-icon-t { background:#4caf50;color:#fff; }
@@ -909,26 +913,29 @@ style.textContent = `
 
 .dshop-reroll {
   padding:4px 10px;border-radius:0;
-  border:2px solid #111;
+  border:2px solid #3a3a3a;
   background:#fff;color:#111;font-size:12px;font-weight:900;
   cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;
-  box-shadow:3px 3px 0px 0px #111;
+  box-shadow:3px 3px 0px 0px #3a3a3a;
 }
 .dshop-reroll:hover {
-  box-shadow:2px 2px 0px 0px #111;
+  box-shadow:2px 2px 0px 0px #3a3a3a;
   transform:translate(1px,1px);
 }
 .dshop-reroll:active {
-  box-shadow:2px 2px 0px 0px #111;
-  transform:translate(2px,2px);
+  box-shadow:2px 2px 0px 0px #3a3a3a;
+  transform:translate(1px,1px);
 }
 .dshop-reroll.full-press {
   box-shadow:none !important;
   transform:translate(3px,3px) !important;
 }
-.dshop-reroll-g { background:#ffc107; }
-.dshop-reroll-p { background:#64b5f6; }
-.dshop-reroll-t { background:#81c784; }
+.dshop-reroll-g { background:#ffc107; border-color:#6b4500; box-shadow:3px 3px 0 0 #6b4500; }
+.dshop-reroll-g:hover,.dshop-reroll-g:active { box-shadow:2px 2px 0 0 #6b4500; }
+.dshop-reroll-p { background:#64b5f6; border-color:#0d3172; box-shadow:3px 3px 0 0 #0d3172; }
+.dshop-reroll-p:hover,.dshop-reroll-p:active { box-shadow:2px 2px 0 0 #0d3172; }
+.dshop-reroll-t { background:#81c784; border-color:#1b4d28; box-shadow:3px 3px 0 0 #1b4d28; }
+.dshop-reroll-t:hover,.dshop-reroll-t:active { box-shadow:2px 2px 0 0 #1b4d28; }
 
 /* ===== 卡片网格 ===== */
 .dshop-grid {
@@ -940,23 +947,23 @@ style.textContent = `
 
 /* ===== 商品卡片 ===== */
 .dcard {
-  border:3px solid #111;border-radius:0;
+  border:3px solid #3a3a3a;border-radius:0;
   background:#fff;overflow:hidden;
   cursor:pointer;
   display:flex;flex-direction:column;
   min-height:90px;
   user-select:none;
-  box-shadow:4px 4px 0px 0px #111;
+  box-shadow:4px 4px 0px 0px #3a3a3a;
   transition:box-shadow 0.15s, transform 0.15s;
   will-change:transform;
 }
 .dcard:hover {
-  box-shadow:3px 3px 0px 0px #111;
+  box-shadow:3px 3px 0px 0px #3a3a3a;
   transform:translate(1px,1px);
 }
 .dcard:active {
-  box-shadow:3px 3px 0px 0px #111;
-  transform:translate(2px,2px);
+  box-shadow:3px 3px 0px 0px #3a3a3a;
+  transform:translate(1px,1px);
 }
 .dcard.dcard-bought {
   opacity:0.4;pointer-events:none;
@@ -964,6 +971,23 @@ style.textContent = `
   box-shadow:none;
   filter:grayscale(0.6);
 }
+/* 各区块颜色偏向阴影+描边 */
+.dshop-section-g .dcard                     { box-shadow:4px 4px 0 0 #6b4500; border-color:#6b4500; }
+.dshop-section-g .dcard:hover,
+.dshop-section-g .dcard:active              { box-shadow:3px 3px 0 0 #6b4500; }
+.dshop-section-p .dcard                     { box-shadow:4px 4px 0 0 #0d3172; border-color:#0d3172; }
+.dshop-section-p .dcard:hover,
+.dshop-section-p .dcard:active              { box-shadow:3px 3px 0 0 #0d3172; }
+.dshop-section-t .dcard                     { box-shadow:4px 4px 0 0 #1b4d28; border-color:#1b4d28; }
+.dshop-section-t .dcard:hover,
+.dshop-section-t .dcard:active              { box-shadow:3px 3px 0 0 #1b4d28; }
+.dshop-section-c .dcard                     { box-shadow:4px 4px 0 0 #400060; border-color:#400060; }
+.dshop-section-c .dcard:hover,
+.dshop-section-c .dcard:active              { box-shadow:3px 3px 0 0 #400060; }
+.dshop-section-g .dcard.dcard-bought,
+.dshop-section-p .dcard.dcard-bought,
+.dshop-section-t .dcard.dcard-bought,
+.dshop-section-c .dcard.dcard-bought        { box-shadow:none; }
 
 /* ---- 属性升级卡体 ---- */
 .dcard-body {
@@ -1058,15 +1082,15 @@ style.textContent = `
 .dshop-footer { margin-top:14px;text-align:center; }
 .dshop-continue {
   padding:10px 32px;font-size:15px;
-  border:3px solid #111;border-radius:0;
+  border:3px solid #7a4f00;border-radius:0;
   color:#111;cursor:pointer;font-weight:900;
   background:#ffc107;
   text-transform:uppercase;letter-spacing:0.06em;
-  box-shadow:5px 5px 0px 0px #111;
+  box-shadow:5px 5px 0px 0px #7a4f00;
   transition:box-shadow 0.15s,transform 0.15s;
 }
 .dshop-continue:hover {
-  box-shadow:4px 4px 0px 0px #111;
+  box-shadow:4px 4px 0px 0px #7a4f00;
   transform:translate(1px,1px);
 }
 .dshop-continue:active {
