@@ -24,6 +24,8 @@ const D = {
   tempCurses: [], // boss关临时诅咒
   // 道具
   items: [], // [{id, name, effect, duration, remaining}]
+  // Buff 实例（新 Buff 系统，逐步迁移 items/curses 到这里）
+  buffs: [], // [{instanceId, buffId, category, level, remaining, sourceStage}]
   // 强化环节
   shopVisitCount: 0,
   timeBuyCount: 0, // P交易购买时间次数(跨轮累计)
@@ -96,6 +98,39 @@ function getAttrEffect(key, level){
   }
 }
 
+// ===== 配置按需加载（不进主程序，进地牢时才注入）=====
+function dungeonLoadData(){
+  if(window.DUNGEON_DATA) return;                               // 已加载
+  if(document.getElementById('dungeonDataScript')) return;      // 加载中
+  var s = document.createElement('script');
+  s.id  = 'dungeonDataScript';
+  s.src = 'game_dungeon_data.js';
+  document.head.appendChild(s);
+}
+
+// ===== 即时道具效果回调（供 DungeonBuff.InstantBuff 调用）=====
+window.dungeonInstantAddGold = function(v){
+  D.gold += (v||0);
+  dungeonRenderGoldUI();
+};
+window.dungeonInstantAddTime = function(v){
+  if(typeof S!=='undefined'){
+    S.timeLeft += (v||0);
+    if(typeof soloUpdateTimerBar==='function') soloUpdateTimerBar();
+  }
+};
+window.dungeonInstantRemoveCurse = function(v){
+  var n = v||1;
+  for(var i=0;i<n;i++){
+    var keys = Object.keys(D.curses);
+    if(!keys.length) break;
+    var k = keys[Math.floor(Math.random()*keys.length)];
+    D.curses[k]--;
+    if(D.curses[k]<=0) delete D.curses[k];
+  }
+  dungeonApplyCurseEffects();
+};
+
 // ===== 核心机制 =====
 
 // 初始化地牢模式
@@ -110,10 +145,13 @@ function dungeonInit(){
   D.curses = {};
   D.tempCurses = [];
   D.items = [];
+  D.buffs = [];
   D.shopVisitCount = 0;
   D.timeBuyCount = 0;
   D.goldBuyCount = 0;
   D.bossActive = false;
+  // 按需加载地牢配置（不进主程序，进地牢时才注入）
+  dungeonLoadData();
   // 切换单词簿为状态区
   const label = document.getElementById('soloBookLabel');
   if(label) label.textContent = '状态';
@@ -728,16 +766,13 @@ function dungeonApplyItemEffect(itemId){
     case 'shield':   D.items.push({id:'shield',   remaining:3}); break;
     case 'focus':    D.items.push({id:'focus',    remaining:1}); break;
     case 'insight':  D.items.push({id:'insight',  remaining:1}); break;
-    case 'goldpot':  D.items.push({id:'goldpot',  remaining:1}); break;
-    case 'purify': {
-      const keys=Object.keys(D.curses);
-      if(keys.length){ const k=keys[Math.floor(Math.random()*keys.length)]; D.curses[k]--; if(D.curses[k]<=0) delete D.curses[k]; dungeonApplyCurseEffects(); }
-      break;
-    }
+    // ── INSTANT 即时道具：走 Buff 系统（InstantBuff 父类读配置 effect+value）──
+    case 'goldpot':  DungeonBuff.addBuff(D, 'goldpot'); break;
+    case 'purify':   DungeonBuff.addBuff(D, 'purify'); break;
+    case 'buytime':  D.timeBuyCount++; DungeonBuff.addBuff(D, 'buytime'); break;
+    case 'buygold':  D.goldBuyCount++; DungeonBuff.addBuff(D, 'buygold'); break;
     case 'lucky':    D.items.push({id:'lucky',    remaining:1}); break;
     case 'slowdown': D.items.push({id:'slowdown', remaining:999}); break;
-    case 'buytime':  if(typeof S!=='undefined'){S.timeLeft+=10; D.timeBuyCount++;} break;
-    case 'buygold':  D.gold+=3; D.goldBuyCount++; dungeonRenderGoldUI(); break;
     case 'rewind':   D.items.push({id:'rewind',   remaining:1}); break;
     case 'medkit':   D.items.push({id:'medkit',   remaining:1}); break;
   }
