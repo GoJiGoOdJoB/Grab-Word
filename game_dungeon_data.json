@@ -1,0 +1,322 @@
+{
+  "version": "20260729.185240",
+  "generatedAt": "2026-07-29T18:52:40",
+  "source": "GW配置表.xlsx",
+  "tables": {
+    "attr_config": {
+      "str": {
+        "id": "str",
+        "name": "力量",
+        "nameEn": "Strength",
+        "lv1": 0.08,
+        "lv2": 0.11,
+        "lv3": 0.14,
+        "lv4": 0.17,
+        "lv5": 0.2,
+        "lv6": 0.23,
+        "lv7": 0.26,
+        "lv8": 0.29,
+        "lv9": 0.32,
+        "lv10": 0.35,
+        "basePrice": 3,
+        "priceStep": 1.5
+      },
+      "wis": {
+        "id": "wis",
+        "name": "智慧",
+        "nameEn": "Wisdom",
+        "lv1": 0.05,
+        "lv2": 0.1,
+        "lv3": 0.15,
+        "lv4": 0.2,
+        "lv5": 0.25,
+        "lv6": 0.3,
+        "lv7": 0.35,
+        "lv8": 0.4,
+        "lv9": 0.45,
+        "lv10": 0.5,
+        "basePrice": 3,
+        "priceStep": 1.5
+      },
+      "brv": {
+        "id": "brv",
+        "name": "勇气",
+        "nameEn": "Bravery",
+        "lv1": 0.08,
+        "lv2": 0.16,
+        "lv3": 0.24,
+        "lv4": 0.32,
+        "lv5": 0.4,
+        "lv6": 0.48,
+        "lv7": 0.56,
+        "lv8": 0.6,
+        "lv9": 0.6,
+        "lv10": 0.6,
+        "basePrice": 3,
+        "priceStep": 1.5
+      },
+      "end": {
+        "id": "end",
+        "name": "耐力",
+        "nameEn": "Endurance",
+        "lv1": 0.07,
+        "lv2": 0.14,
+        "lv3": 0.21,
+        "lv4": 0.28,
+        "lv5": 0.35,
+        "lv6": 0.42,
+        "lv7": 0.49,
+        "lv8": 0.56,
+        "lv9": 0.6,
+        "lv10": 0.6,
+        "basePrice": 3,
+        "priceStep": 1.5
+      },
+      "dex": {
+        "id": "dex",
+        "name": "技巧",
+        "nameEn": "Dexterity",
+        "lv1": 0.02,
+        "lv2": 0.04,
+        "lv3": 0.06,
+        "lv4": 0.08,
+        "lv5": 0.1,
+        "lv6": 0.12,
+        "lv7": 0.14,
+        "lv8": 0.16,
+        "lv9": 0.18,
+        "lv10": 0.2,
+        "basePrice": 3,
+        "priceStep": 1.5
+      },
+      "luk": {
+        "id": "luk",
+        "name": "运气",
+        "nameEn": "Luck",
+        "lv1": 0.05,
+        "lv2": 0.1,
+        "lv3": 0.15,
+        "lv4": 0.2,
+        "lv5": 0.25,
+        "lv6": 0.3,
+        "lv7": 0.35,
+        "lv8": 0.4,
+        "lv9": 0.45,
+        "lv10": 0.5,
+        "basePrice": 3,
+        "priceStep": 1.5
+      }
+    },
+    "item_config": {
+      "shield": {
+        "id": "shield",
+        "name": "护盾",
+        "nameEn": "Shield",
+        "category": "PASSIVE",
+        "triggerOn": "WRONG",
+        "remaining": 3,
+        "shopZone": "G",
+        "basePrice": 5,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "focus": {
+        "id": "focus",
+        "name": "专注",
+        "nameEn": "Focus",
+        "category": "PASSIVE",
+        "triggerOn": "COMPLETE",
+        "remaining": 1,
+        "shopZone": "G",
+        "basePrice": 4,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "insight": {
+        "id": "insight",
+        "name": "洞察",
+        "nameEn": "Insight",
+        "category": "PASSIVE",
+        "triggerOn": "COMPLETE",
+        "remaining": 1,
+        "shopZone": "G",
+        "basePrice": 4,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "slowdown": {
+        "id": "slowdown",
+        "name": "缓行者",
+        "nameEn": "Slowdown",
+        "category": "PASSIVE",
+        "triggerOn": "TICK",
+        "remaining": 999,
+        "shopZone": "G",
+        "basePrice": 12,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "lucky": {
+        "id": "lucky",
+        "name": "幸运星",
+        "nameEn": "Lucky Star",
+        "category": "PASSIVE",
+        "triggerOn": "SHINY",
+        "remaining": 1,
+        "shopZone": "G",
+        "basePrice": 9,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "rewind": {
+        "id": "rewind",
+        "name": "时间回溯",
+        "nameEn": "Rewind",
+        "category": "PASSIVE",
+        "triggerOn": "TIMEOUT",
+        "remaining": 1,
+        "shopZone": "T",
+        "basePrice": 8,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "medkit": {
+        "id": "medkit",
+        "name": "急救包",
+        "nameEn": "Med Kit",
+        "category": "PASSIVE",
+        "triggerOn": "LIFE",
+        "remaining": 1,
+        "shopZone": "T",
+        "basePrice": 6,
+        "priceStep": 1,
+        "repeatable": 0
+      },
+      "goldpot": {
+        "id": "goldpot",
+        "name": "金币罐",
+        "nameEn": "Gold Pot",
+        "category": "INSTANT",
+        "effect": "ADD_GOLD",
+        "value": 5,
+        "shopZone": "G",
+        "basePrice": 3,
+        "priceStep": 1,
+        "repeatable": 1
+      },
+      "buytime": {
+        "id": "buytime",
+        "name": "购买时间",
+        "nameEn": "Buy Time",
+        "category": "INSTANT",
+        "effect": "ADD_TIME",
+        "value": 10,
+        "shopZone": "P",
+        "basePrice": 15,
+        "priceStep": 1.3,
+        "repeatable": 1
+      },
+      "buygold": {
+        "id": "buygold",
+        "name": "购买金币",
+        "nameEn": "Buy Gold",
+        "category": "INSTANT",
+        "effect": "ADD_GOLD",
+        "value": 3,
+        "shopZone": "T",
+        "basePrice": 5,
+        "priceStep": 1.4,
+        "repeatable": 1
+      },
+      "purify": {
+        "id": "purify",
+        "name": "净化",
+        "nameEn": "Purify",
+        "category": "INSTANT",
+        "effect": "RM_CURSE",
+        "value": 1,
+        "shopZone": "G",
+        "basePrice": 10,
+        "priceStep": 1,
+        "repeatable": 1
+      }
+    },
+    "curse_config": {
+      "daze": {
+        "id": "daze",
+        "name": "恍惚",
+        "nameEn": "Daze",
+        "maxLv": 5,
+        "appliesOn": "RENDER",
+        "perLevel": "每级字母闪烁频率+20%"
+      },
+      "illusion": {
+        "id": "illusion",
+        "name": "幻觉",
+        "nameEn": "Illusion",
+        "maxLv": 3,
+        "appliesOn": "DEAL",
+        "perLevel": "每级互换字母数+1"
+      },
+      "imbalance": {
+        "id": "imbalance",
+        "name": "失衡",
+        "nameEn": "Imbalance",
+        "maxLv": 5,
+        "appliesOn": "RENDER",
+        "perLevel": "每级倒转字母数+1"
+      },
+      "fatigue": {
+        "id": "fatigue",
+        "name": "乏力",
+        "nameEn": "Fatigue",
+        "maxLv": 0,
+        "appliesOn": "SCORE",
+        "perLevel": "每级积分降低比例+10%（上限80%）"
+      },
+      "regret": {
+        "id": "regret",
+        "name": "后悔",
+        "nameEn": "Regret",
+        "maxLv": 0,
+        "appliesOn": "BREAK",
+        "perLevel": "每级连击中断扣分+2，3级以上额外扣时间"
+      },
+      "shackle": {
+        "id": "shackle",
+        "name": "镣铐",
+        "nameEn": "Shackle",
+        "maxLv": 0,
+        "appliesOn": "FLOW",
+        "perLevel": "每级流速乘数+10%"
+      }
+    },
+    "shop_coeff": {
+      "shopGlobalCoeff": {
+        "key": "shopGlobalCoeff",
+        "desc": "商店整体递增系数(每进一次店所有商品价格倍数)",
+        "value": 1.1
+      },
+      "rerollPriceG": {
+        "key": "rerollPriceG",
+        "desc": "G区刷新价格",
+        "value": 2
+      },
+      "rerollPriceP": {
+        "key": "rerollPriceP",
+        "desc": "P区刷新价格",
+        "value": 15
+      },
+      "rerollPriceT": {
+        "key": "rerollPriceT",
+        "desc": "T区刷新价格",
+        "value": 5
+      },
+      "rerollPriceC": {
+        "key": "rerollPriceC",
+        "desc": "C区刷新价格",
+        "value": 1
+      }
+    }
+  }
+}
