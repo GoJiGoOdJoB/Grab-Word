@@ -1,7 +1,7 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-07-29T22:49:37
-// 源文件数: 1
+// 生成时间: 2026-07-30T00:14:45
+// 源文件数: 14
 // ============================================================
 
 // ---- buffs/_base.js ----
@@ -176,3 +176,128 @@ window.DungeonBuff = (function () {
     getAttrEffect: getAttrEffect,
   };
 })();
+
+// ---- buffs/curse/daze.js ----
+// buffs/curse/daze.js
+// TODO(daze)：字母随机闪烁透明度
+DungeonBuff.register('daze', class extends DungeonBuff.CurseBuff {
+  onEvent(D, instance, eventType, payload) {
+    if (eventType !== 'RENDER') return;
+    // TODO: 字母随机闪烁透明度
+  }
+});
+
+// ---- buffs/curse/fatigue.js ----
+// buffs/curse/fatigue.js
+// TODO(fatigue)：积分降低比例
+DungeonBuff.register('fatigue', class extends DungeonBuff.CurseBuff {
+  query(D, instance, queryKey) {
+    if (queryKey !== 'SCORE_MULT') return null;
+    // TODO: 积分降低比例（按 instance.level 返回 { additive } 或 { multiplier }）
+    return null;
+  }
+});
+
+// ---- buffs/curse/illusion.js ----
+// buffs/curse/illusion.js
+// TODO(illusion)：手牌字母随机互换位置
+DungeonBuff.register('illusion', class extends DungeonBuff.CurseBuff {
+  onEvent(D, instance, eventType, payload) {
+    if (eventType !== 'DEAL') return;
+    // TODO: 手牌字母随机互换位置
+  }
+});
+
+// ---- buffs/curse/imbalance.js ----
+// buffs/curse/imbalance.js
+// TODO(imbalance)：字母随机倒转
+DungeonBuff.register('imbalance', class extends DungeonBuff.CurseBuff {
+  onEvent(D, instance, eventType, payload) {
+    if (eventType !== 'RENDER') return;
+    // TODO: 字母随机倒转
+  }
+});
+
+// ---- buffs/curse/regret.js ----
+// buffs/curse/regret.js
+// TODO(regret)：连击中断扣额外分/时间
+DungeonBuff.register('regret', class extends DungeonBuff.CurseBuff {
+  onEvent(D, instance, eventType, payload) {
+    if (eventType !== 'BREAK') return;
+    // TODO: 连击中断扣额外分/时间
+  }
+});
+
+// ---- buffs/curse/shackle.js ----
+// buffs/curse/shackle.js
+// TODO(shackle)：流速加成比例
+DungeonBuff.register('shackle', class extends DungeonBuff.CurseBuff {
+  query(D, instance, queryKey) {
+    if (queryKey !== 'FLOW_MULT') return null;
+    // TODO: 流速加成比例（按 instance.level 返回 { additive } 或 { multiplier }）
+    return null;
+  }
+});
+
+// ---- buffs/passive/focus.js ----
+// buffs/passive/focus.js
+// TODO(focus)：答对触发，延长下一题答题窗口
+DungeonBuff.register('focus', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 答对触发，延长下一题答题窗口
+  }
+});
+
+// ---- buffs/passive/insight.js ----
+// buffs/passive/insight.js
+// TODO(insight)：答对触发，显示提示字母
+DungeonBuff.register('insight', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 答对触发，显示提示字母
+  }
+});
+
+// ---- buffs/passive/lucky.js ----
+// buffs/passive/lucky.js
+// TODO(lucky)：炫彩判定时概率翻倍
+DungeonBuff.register('lucky', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 炫彩判定时概率翻倍
+  }
+});
+
+// ---- buffs/passive/medkit.js ----
+// buffs/passive/medkit.js
+// TODO(medkit)：掉命时触发，补一条命
+DungeonBuff.register('medkit', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 掉命时触发，补一条命
+  }
+});
+
+// ---- buffs/passive/rewind.js ----
+// buffs/passive/rewind.js
+// TODO(rewind)：超时触发，恢复时间
+DungeonBuff.register('rewind', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 超时触发，恢复时间
+  }
+});
+
+// ---- buffs/passive/shield.js ----
+// buffs/passive/shield.js
+// TODO(shield)：抵消错牌惩罚（免压力/冷却）
+DungeonBuff.register('shield', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 抵消错牌惩罚（免压力/冷却）
+  }
+});
+
+// ---- buffs/passive/slowdown.js ----
+// buffs/passive/slowdown.js
+// TODO(slowdown)：每 tick 降低答题流速
+DungeonBuff.register('slowdown', class extends DungeonBuff.PassiveBuff {
+  _applyEffect(D, instance, payload) {
+    // TODO: 每 tick 降低答题流速
+  }
+});
