@@ -10,8 +10,6 @@
 // ===== 地牢状态 =====
 const D = {
   active: false,
-  // 属性系统
-  attrs: { str:0, wis:0, brv:0, end:0, dex:0, luk:0 },
   // 货币
   gold: 0,
   // 压力系统
@@ -19,17 +17,13 @@ const D = {
   stressThreshold: 40,
   stressTriggerCount: 0,
   wrongCountSession: 0, // 本题错牌累计(用于压力计算)
-  // 诅咒
-  curses: {}, // {curseName: level}
-  tempCurses: [], // boss关临时诅咒
-  // 道具
-  items: [], // [{id, name, effect, duration, remaining}]
-  // Buff 实例（新 Buff 系统，逐步迁移 items/curses 到这里）
+  // boss关临时诅咒（记 curseKey，退出时按 key 降级）
+  tempCurses: [],
+  // 统一数据源：ATTR/PASSIVE/CURSE/INSTANT 全部实例化到这里
   buffs: [], // [{instanceId, buffId, category, level, remaining, sourceStage}]
   // 强化环节
   shopVisitCount: 0,
-  timeBuyCount: 0, // P交易购买时间次数(跨轮累计)
-  goldBuyCount: 0, // T交易购买金币次数(不跨轮)
+  buyCounts: {}, // {buffId: 本局已购买次数}，统一定价公式的 n
   // Boss
   bossActive: false,
 };
@@ -48,14 +42,6 @@ const DUNGEON_CFG = {
   wrongStressStartAt: 3, // 从第3次错牌开始累计压力
   shopFirstTriggerStage: 3, // 初中1星
   shopPreviewHoldTime: 1500, // ms
-  attrPriceBase: 3,
-  attrPriceLevelCoeff: 1.5,
-  attrPriceStageCoeff: 1.2,
-  timeBuyPriceBase: 15,
-  timeBuyCountCoeff: 1.3,
-  timeBuyStageCoeff: 1.1,
-  goldBuyPriceBase: 5,
-  goldBuyCountCoeff: 1.4,
 };
 
 // ===== 属性名称映射 =====
@@ -85,17 +71,42 @@ function getStageTier(stageIdx){
   return 'easy';
 }
 
+// 属性效果：委托配置驱动版（Lv{level} 列），无公式
 function getAttrEffect(key, level){
   if(level<=0) return 0;
-  switch(key){
-    case 'str': return 0.05 + level*0.03; // 段位积分额外比例
-    case 'wis': return Math.min(0.5, level*0.05); // 流速降低比例
-    case 'brv': return Math.min(0.6, level*0.08); // 惩罚降低比例
-    case 'end': return Math.min(0.6, level*0.07); // 压力累积降低比例
-    case 'dex': return level*0.02; // 炫彩概率加成
-    case 'luk': return level*0.05; // 品质/诅咒运气加成
-    default: return 0;
+  if(typeof DungeonBuff!=='undefined' && DungeonBuff.getAttrEffect){
+    return DungeonBuff.getAttrEffect(key, level);
   }
+  return 0;
+}
+
+// ===== 统一数据源 D.buffs：层级辅助 =====
+// ATTR / CURSE 为「按 id 唯一的等级实例」，PASSIVE / INSTANT 为独立实例
+function dungeonFindBuff(buffId){
+  for(var i=0;i<D.buffs.length;i++){ if(D.buffs[i].buffId===buffId) return D.buffs[i]; }
+  return null;
+}
+function dungeonLevelOf(buffId){
+  var b = dungeonFindBuff(buffId);
+  return b ? b.level : 0;
+}
+function dungeonMaxLevelOf(buffId){
+  if(ATTR_NAMES[buffId]) return 10;                       // 属性封顶 Lv10
+  if(CURSE_DEFS[buffId]) return CURSE_DEFS[buffId].maxLv || 0; // 0 = 无上限
+  return 0;
+}
+// 升/降 ATTR/CURSE 等级；不存在则创建，降到 0 则移除
+function dungeonAddLevel(buffId, delta){
+  var b = dungeonFindBuff(buffId);
+  if(!b){
+    if(delta<=0) return;
+    b = DungeonBuff.addBuff(D, buffId, {level:0});
+  }
+  b.level += delta;
+  var mx = dungeonMaxLevelOf(buffId);
+  if(mx>0 && b.level>mx) b.level = mx;
+  if(b.level<=0) DungeonBuff.removeBuff(D, b.instanceId);
+  return b;
 }
 
 // ===== 配置按需加载（不进主程序，进地牢时才注入）=====
@@ -122,11 +133,10 @@ window.dungeonInstantAddTime = function(v){
 window.dungeonInstantRemoveCurse = function(v){
   var n = v||1;
   for(var i=0;i<n;i++){
-    var keys = Object.keys(D.curses);
-    if(!keys.length) break;
-    var k = keys[Math.floor(Math.random()*keys.length)];
-    D.curses[k]--;
-    if(D.curses[k]<=0) delete D.curses[k];
+    var curses = D.buffs.filter(function(b){ return b.category==='CURSE' && b.level>0; });
+    if(!curses.length) break;
+    var pick = curses[Math.floor(Math.random()*curses.length)];
+    dungeonAddLevel(pick.buffId, -1);
   }
   dungeonApplyCurseEffects();
 };
@@ -136,19 +146,15 @@ window.dungeonInstantRemoveCurse = function(v){
 // 初始化地牢模式
 function dungeonInit(){
   D.active = true;
-  D.attrs = { str:0, wis:0, brv:0, end:0, dex:0, luk:0 };
   D.gold = 0;
   D.stress = 0;
   D.stressThreshold = DUNGEON_CFG.stressThresholdBase;
   D.stressTriggerCount = 0;
   D.wrongCountSession = 0;
-  D.curses = {};
   D.tempCurses = [];
-  D.items = [];
   D.buffs = [];
   D.shopVisitCount = 0;
-  D.timeBuyCount = 0;
-  D.goldBuyCount = 0;
+  D.buyCounts = {};
   D.bossActive = false;
   // 按需加载地牢配置（不进主程序，进地牢时才注入）
   dungeonLoadData();
@@ -174,7 +180,7 @@ function dungeonReset(){
 
 function dungeonAddStress(amount){
   if(!D.active) return;
-  const endReduction = getAttrEffect('end', D.attrs.end);
+  const endReduction = getAttrEffect('end', dungeonLevelOf('end'));
   const actual = Math.max(0, Math.round(amount * (1 - endReduction)));
   D.stress += actual;
   dungeonRenderStressBar();
@@ -192,13 +198,13 @@ function dungeonTriggerCurse(){
   const available = CURSE_KEYS.filter(k=>{
     const def = CURSE_DEFS[k];
     if(def.maxLv===0) return true; // 无上限
-    return (D.curses[k]||0) < def.maxLv;
+    return dungeonLevelOf(k) < def.maxLv;
   });
   if(available.length===0) return; // 所有诅咒满级
-  const luk = getAttrEffect('luk', D.attrs.luk);
+  const luk = getAttrEffect('luk', dungeonLevelOf('luk'));
   // 运气降低高层诅咒概率(简化：运气越高越倾向选已有等级低的)
   const picked = available[Math.floor(Math.random()*available.length)];
-  D.curses[picked] = (D.curses[picked]||0) + 1;
+  dungeonAddLevel(picked, 1);
   dungeonShowCurseEffect(picked);
   dungeonRenderStateArea();
   dungeonApplyCurseEffects();
@@ -245,12 +251,12 @@ function dungeonEnterBoss(){
   const available = CURSE_KEYS.filter(k=>{
     const def = CURSE_DEFS[k];
     if(def.maxLv===0) return true;
-    return (D.curses[k]||0) < def.maxLv;
+    return dungeonLevelOf(k) < def.maxLv;
   });
   if(available.length>0){
     const picked = available[Math.floor(Math.random()*available.length)];
     D.tempCurses.push({key:picked});
-    D.curses[picked] = (D.curses[picked]||0) + 1;
+    dungeonAddLevel(picked, 1);
     dungeonApplyCurseEffects();
     dungeonRenderStateArea();
   }
@@ -263,10 +269,7 @@ function dungeonExitBoss(){
   D.bossActive = false;
   // 移除临时诅咒
   D.tempCurses.forEach(tc=>{
-    if(D.curses[tc.key] && D.curses[tc.key]>0){
-      D.curses[tc.key]--;
-      if(D.curses[tc.key]===0) delete D.curses[tc.key];
-    }
+    if(dungeonLevelOf(tc.key) > 0) dungeonAddLevel(tc.key, -1);
   });
   D.tempCurses = [];
   dungeonApplyCurseEffects();
@@ -283,32 +286,32 @@ function dungeonExitBoss(){
 // 流速修正(智慧)
 function dungeonGetFlowRateMultiplier(){
   if(!D.active) return 1;
-  return Math.max(0.3, 1 - getAttrEffect('wis', D.attrs.wis));
+  return Math.max(0.3, 1 - getAttrEffect('wis', dungeonLevelOf('wis')));
 }
 
 // 惩罚修正(勇气)
 function dungeonGetPenaltyMultiplier(){
   if(!D.active) return 1;
-  return Math.max(0.2, 1 - getAttrEffect('brv', D.attrs.brv));
+  return Math.max(0.2, 1 - getAttrEffect('brv', dungeonLevelOf('brv')));
 }
 
 // 段位积分额外加成(力量)
 function dungeonGetPromoScoreBonus(baseScore){
   if(!D.active) return 0;
-  return Math.round(baseScore * getAttrEffect('str', D.attrs.str));
+  return Math.round(baseScore * getAttrEffect('str', dungeonLevelOf('str')));
 }
 
 // 炫彩概率加成(技巧)
 function dungeonGetShinyBonus(){
   if(!D.active) return 0;
-  return getAttrEffect('dex', D.attrs.dex);
+  return getAttrEffect('dex', dungeonLevelOf('dex'));
 }
 
 // ===== 诅咒效果应用 =====
 
 function dungeonApplyCurseEffects(){
   // 镣铐: 增加答题流速
-  const shackleLv = D.curses.shackle || 0;
+  const shackleLv = dungeonLevelOf('shackle');
   if(typeof S!=='undefined' && D.active){
     // Store dungeon flow penalty for main loop to read
     D._shackleFlowBonus = shackleLv * 0.1;
@@ -317,14 +320,14 @@ function dungeonApplyCurseEffects(){
 
 // 乏力: 段位积分累计降低
 function dungeonGetFatigueReduction(){
-  const fatigueLv = D.curses.fatigue || 0;
+  const fatigueLv = dungeonLevelOf('fatigue');
   if(fatigueLv===0) return 0;
   return Math.min(0.8, 0.15 + (fatigueLv-1)*0.10);
 }
 
 // 后悔: 连击中断额外扣分/扣时间
 function dungeonApplyRegret(){
-  const regretLv = D.curses.regret || 0;
+  const regretLv = dungeonLevelOf('regret');
   if(regretLv===0 || !D.active) return;
   const scorePenalty = regretLv * 2;
   const timePenalty = Math.max(0, regretLv - 2);
@@ -343,7 +346,6 @@ function dungeonShouldShowShop(stageIdx){
 
 function dungeonOpenShop(){
   D.shopVisitCount++;
-  D.goldBuyCount = 0;
   dungeonRenderShop();
 }
 
@@ -402,18 +404,45 @@ function dungeonRenderShop(){
 
 // ===== 商品卡片 HTML 生成 =====
 
+// ===== 统一定价公式（§3.1.2）=====
+// 最终价格 = 基础价格 × 价格递增系数^n × 商店整体递增系数^m
+//   n = 该商品本局已购买次数 (D.buyCounts)
+//   m = 已进入商店次数 (D.shopVisitCount 从 1 起算，故 m = shopVisitCount-1)
+function dungeonShopCoeff(){
+  const t  = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  const sc = (t.shop_coeff && t.shop_coeff.shopGlobalCoeff) || null;
+  return (sc && typeof sc.value==='number') ? sc.value : 1.1;
+}
+function dungeonPriceDef(buffId){
+  const t = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  return (t.attr_config && t.attr_config[buffId]) ||
+         (t.item_config && t.item_config[buffId]) || null;
+}
+function dungeonPrice(buffId){
+  const def = dungeonPriceDef(buffId);
+  if(!def) return 0;
+  const base = (typeof def.basePrice==='number') ? def.basePrice : 0;
+  const step = (typeof def.priceStep==='number') ? def.priceStep : 1;
+  const n    = D.buyCounts[buffId] || 0;
+  const m    = Math.max(0, D.shopVisitCount - 1);
+  return Math.round(base * Math.pow(step, n) * Math.pow(dungeonShopCoeff(), m));
+}
+// 刷新价（来自 shop_coeff.rerollPrice{G|P|T|C}）
+function dungeonRerollPrice(curUpper){
+  const fallback = { G:2, P:15, T:5, C:1 };
+  const t  = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  const sc = (t.shop_coeff && t.shop_coeff['rerollPrice'+curUpper]) || null;
+  return (sc && typeof sc.value==='number') ? sc.value : (fallback[curUpper] || 0);
+}
+
 // 属性升级卡片
 // currency: 'g'|'p'|'t'
 function dungeonAttrCardHTML(attrKey, currency){
   const cnName  = ATTR_NAMES[attrKey];
   const enName  = {str:'Strength',wis:'Wisdom',brv:'Bravery',end:'Endurance',dex:'Dexterity',luk:'Luck'}[attrKey];
-  const curLv   = D.attrs[attrKey];
+  const curLv   = dungeonLevelOf(attrKey);
   const nextLv  = curLv + 1;
-  const price   = Math.round(
-    DUNGEON_CFG.attrPriceBase
-    * Math.pow(DUNGEON_CFG.attrPriceLevelCoeff, curLv)
-    * Math.pow(DUNGEON_CFG.attrPriceStageCoeff, Math.floor((typeof S!=='undefined'?S.stageIdx:0)/3))
-  );
+  const price   = dungeonPrice(attrKey);
   const cur     = currency.toUpperCase();
   return `
     <div class="dcard dcard-attr" data-attr="${attrKey}" data-price="${price}" data-cur="${cur}">
@@ -438,8 +467,9 @@ function dungeonAttrCardHTML(attrKey, currency){
 // 道具卡片
 function dungeonItemCardHTML(itemDef, currency){
   const cur = currency.toUpperCase();
+  const price = dungeonPrice(itemDef.id) || itemDef.price || 0;
   return `
-    <div class="dcard dcard-item" data-item="${itemDef.id}" data-price="${itemDef.price}" data-cur="${cur}">
+    <div class="dcard dcard-item" data-item="${itemDef.id}" data-price="${price}" data-cur="${cur}">
       <div class="dcard-body dcard-body-item">
         <div class="dcard-item-text">
           <span class="dcard-item-en">${itemDef.nameEn||itemDef.id}</span>
@@ -448,7 +478,7 @@ function dungeonItemCardHTML(itemDef, currency){
         <div class="dcard-item-icon"></div>
       </div>
       <div class="dcard-cost dcard-cost-${cur.toLowerCase()}">
-        <span class="dcard-cost-num">${itemDef.price}</span>
+        <span class="dcard-cost-num">${price}</span>
         <span class="dcard-cost-unit">${cur}</span>
       </div>
     </div>`;
@@ -492,7 +522,7 @@ function dungeonRenderGSection(){
         <span class="dshop-section-icon dshop-icon-g">G</span>
         <span class="dshop-section-label">金币交易</span>
       </div>
-      <button class="dshop-reroll dshop-reroll-g" data-price="2" data-cur="G">⟳ 2G</button>
+      <button class="dshop-reroll dshop-reroll-g" data-price="${dungeonRerollPrice('G')}" data-cur="G">⟳ ${dungeonRerollPrice('G')}G</button>
     </div>
     <div class="dshop-grid dshop-grid-6">
       ${cards.join('')}
@@ -508,12 +538,7 @@ function dungeonRenderPSection(){
   section.className = 'dshop-section dshop-section-p';
 
   const attrs = shuffle(ATTR_KEYS.slice()).slice(0,2);
-  const timePrice = Math.round(
-    DUNGEON_CFG.timeBuyPriceBase
-    * Math.pow(DUNGEON_CFG.timeBuyCountCoeff, D.timeBuyCount)
-    * Math.pow(DUNGEON_CFG.timeBuyStageCoeff, Math.floor((typeof S!=='undefined'?S.stageIdx:0)/3))
-  );
-  const buyTimeItem = {id:'buytime', name:'购买时间', nameEn:'Buy Time +10s', price:timePrice};
+  const buyTimeItem = {id:'buytime', name:'购买时间', nameEn:'Buy Time +10s'};
   const cards = [
     dungeonItemCardHTML(buyTimeItem, 'p'),
     dungeonAttrCardHTML(attrs[0], 'p'),
@@ -526,7 +551,7 @@ function dungeonRenderPSection(){
         <span class="dshop-section-icon dshop-icon-p">P</span>
         <span class="dshop-section-label">分数交易</span>
       </div>
-      <button class="dshop-reroll dshop-reroll-p" data-price="15" data-cur="P">⟳ 15P</button>
+      <button class="dshop-reroll dshop-reroll-p" data-price="${dungeonRerollPrice('P')}" data-cur="P">⟳ ${dungeonRerollPrice('P')}P</button>
     </div>
     <div class="dshop-grid dshop-grid-3">
       ${cards.join('')}
@@ -541,8 +566,7 @@ function dungeonRenderTSection(){
   const section = document.createElement('div');
   section.className = 'dshop-section dshop-section-t';
 
-  const goldPrice = Math.round(DUNGEON_CFG.goldBuyPriceBase * Math.pow(DUNGEON_CFG.goldBuyCountCoeff, D.goldBuyCount));
-  const buyGoldItem = {id:'buygold', name:'购买金币', nameEn:'Buy Gold +3G', price:goldPrice};
+  const buyGoldItem = {id:'buygold', name:'购买金币', nameEn:'Buy Gold +3G'};
   const cards = [
     dungeonItemCardHTML(buyGoldItem, 't'),
     dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0], 't'),
@@ -555,7 +579,7 @@ function dungeonRenderTSection(){
         <span class="dshop-section-icon dshop-icon-t">T</span>
         <span class="dshop-section-label">时间交易</span>
       </div>
-      <button class="dshop-reroll dshop-reroll-t" data-price="5" data-cur="T">⟳ 5s</button>
+      <button class="dshop-reroll dshop-reroll-t" data-price="${dungeonRerollPrice('T')}" data-cur="T">⟳ ${dungeonRerollPrice('T')}s</button>
     </div>
     <div class="dshop-grid dshop-grid-3">
       ${cards.join('')}
@@ -662,12 +686,10 @@ function dungeonBindRerollBtn(section){
         ];
       } else if(currency==='p'){
         const attrs = shuffle(ATTR_KEYS.slice()).slice(0,2);
-        const timePrice = Math.round(DUNGEON_CFG.timeBuyPriceBase*Math.pow(DUNGEON_CFG.timeBuyCountCoeff,D.timeBuyCount)*Math.pow(DUNGEON_CFG.timeBuyStageCoeff,Math.floor((typeof S!=='undefined'?S.stageIdx:0)/3)));
-        newCards = [dungeonItemCardHTML({id:'buytime',name:'购买时间',nameEn:'Buy Time +10s',price:timePrice},'p'),dungeonAttrCardHTML(attrs[0],'p'),dungeonAttrCardHTML(attrs[1],'p')];
+        newCards = [dungeonItemCardHTML({id:'buytime',name:'购买时间',nameEn:'Buy Time +10s'},'p'),dungeonAttrCardHTML(attrs[0],'p'),dungeonAttrCardHTML(attrs[1],'p')];
       } else if(currency==='t'){
-        const goldPrice = Math.round(DUNGEON_CFG.goldBuyPriceBase*Math.pow(DUNGEON_CFG.goldBuyCountCoeff,D.goldBuyCount));
         const attrs = shuffle(ATTR_KEYS.slice()).slice(0,1);
-        newCards = [dungeonItemCardHTML({id:'buygold',name:'购买金币',nameEn:'Buy Gold +3',price:goldPrice},'t'),dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0],'t'),dungeonAttrCardHTML(attrs[0],'t')];
+        newCards = [dungeonItemCardHTML({id:'buygold',name:'购买金币',nameEn:'Buy Gold +3'},'t'),dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0],'t'),dungeonAttrCardHTML(attrs[0],'t')];
       }
       grid.innerHTML = newCards.join('');
       dungeonBindCardClicks(section, currency);
@@ -727,11 +749,14 @@ function dungeonBindCardClicks(section, currency){
       // 执行效果
       if(card.classList.contains('dcard-attr')){
         const attrKey = card.dataset.attr;
-        D.attrs[attrKey]++;
+        D.buyCounts[attrKey] = (D.buyCounts[attrKey]||0) + 1;
+        dungeonAddLevel(attrKey, 1);
         dungeonApplyCurseEffects();
         dungeonRenderStateArea();
       } else {
-        dungeonApplyItemEffect(card.dataset.item);
+        const itemId = card.dataset.item;
+        D.buyCounts[itemId] = (D.buyCounts[itemId]||0) + 1;
+        dungeonApplyItemEffect(itemId);
         dungeonRenderStateArea();
       }
       // 购买后重新评估所有卡片可购买状态
@@ -762,20 +787,11 @@ function dungeonDeductCost(price, cur){
 }
 
 function dungeonApplyItemEffect(itemId){
-  switch(itemId){
-    case 'shield':   D.items.push({id:'shield',   remaining:3}); break;
-    case 'focus':    D.items.push({id:'focus',    remaining:1}); break;
-    case 'insight':  D.items.push({id:'insight',  remaining:1}); break;
-    // ── INSTANT 即时道具：走 Buff 系统（InstantBuff 父类读配置 effect+value）──
-    case 'goldpot':  DungeonBuff.addBuff(D, 'goldpot'); break;
-    case 'purify':   DungeonBuff.addBuff(D, 'purify'); break;
-    case 'buytime':  D.timeBuyCount++; DungeonBuff.addBuff(D, 'buytime'); break;
-    case 'buygold':  D.goldBuyCount++; DungeonBuff.addBuff(D, 'buygold'); break;
-    case 'lucky':    D.items.push({id:'lucky',    remaining:1}); break;
-    case 'slowdown': D.items.push({id:'slowdown', remaining:999}); break;
-    case 'rewind':   D.items.push({id:'rewind',   remaining:1}); break;
-    case 'medkit':   D.items.push({id:'medkit',   remaining:1}); break;
-  }
+  // 已登记道具统一走 Buff 系统（PASSIVE 子类 / INSTANT 父类各自处理）
+  var t  = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  var ic = t.item_config || {};
+  if(ic[itemId]) DungeonBuff.addBuff(D, itemId);
+  // 未登记的诅咒组合道具(immortal/timelord/...)本身无效果，效果由其附带诅咒实现
 }
 
 function dungeonCloseShop(){
@@ -854,29 +870,33 @@ function dungeonRenderStateArea(){
   if(!book || !D.active) return;
   // 单词簿同款风格：纯文本标签，居左，无背景，无圆角
   let html = '<div style="font-size:10px;color:#999;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px;">STATE</div>';
+  const buffs = D.buffs || [];
   // Attributes
-  const attrEntries = ATTR_KEYS.filter(k=>D.attrs[k]>0);
+  const attrEntries = buffs.filter(b=>b.category==='ATTR' && b.level>0);
   if(attrEntries.length>0){
     html += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px;margin-bottom:4px;">';
-    attrEntries.forEach(k=>{
-      html += `<span style="font-size:12px;font-weight:900;color:#0d3172;">${ATTR_NAMES[k]}&thinsp;${D.attrs[k]}</span>`;
+    attrEntries.forEach(b=>{
+      html += `<span style="font-size:12px;font-weight:900;color:#0d3172;">${ATTR_NAMES[b.buffId]||b.buffId}&thinsp;${b.level}</span>`;
     });
     html += '</div>';
   }
   // Curses
-  const curseEntries = Object.entries(D.curses).filter(([,lv])=>lv>0);
+  const curseEntries = buffs.filter(b=>b.category==='CURSE' && b.level>0);
   if(curseEntries.length>0){
     html += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px;margin-bottom:4px;">';
-    curseEntries.forEach(([k,lv])=>{
-      html += `<span style="font-size:12px;font-weight:900;color:#400060;">${CURSE_DEFS[k]?.name||k}&thinsp;Lv.${lv}</span>`;
+    curseEntries.forEach(b=>{
+      html += `<span style="font-size:12px;font-weight:900;color:#400060;">${CURSE_DEFS[b.buffId]?.name||b.buffId}&thinsp;Lv.${b.level}</span>`;
     });
     html += '</div>';
   }
-  // Items
-  if(D.items.length>0){
+  // Passive items
+  const itemEntries = buffs.filter(b=>b.category==='PASSIVE');
+  if(itemEntries.length>0){
+    const ic = ((typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {}).item_config || {};
     html += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px;">';
-    D.items.forEach(it=>{
-      html += `<span style="font-size:12px;font-weight:900;color:#1b4d28;">${it.id}</span>`;
+    itemEntries.forEach(b=>{
+      const nm = (ic[b.buffId] && ic[b.buffId].name) || b.buffId;
+      html += `<span style="font-size:12px;font-weight:900;color:#1b4d28;">${nm}</span>`;
     });
     html += '</div>';
   }

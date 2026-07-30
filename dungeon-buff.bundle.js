@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-07-30T00:14:45
+// 生成时间: 2026-07-30T15:32:08
 // 源文件数: 14
 // ============================================================
 
@@ -25,6 +25,14 @@ window.DungeonBuff = (function () {
            (t.item_config && t.item_config[buffId]) ||
            (t.curse_config && t.curse_config[buffId]) ||
            null;
+  }
+  // 按来源表推断分类（attr_config→ATTR / curse_config→CURSE / item_config 自带 PASSIVE|INSTANT）
+  function categoryOf(buffId) {
+    var t = catalog();
+    if (t.attr_config && t.attr_config[buffId]) return 'ATTR';
+    if (t.item_config && t.item_config[buffId]) return t.item_config[buffId].category || 'PASSIVE';
+    if (t.curse_config && t.curse_config[buffId]) return 'CURSE';
+    return 'ATTR';
   }
   // 属性效果：直接取 Lv{level} 列（数据驱动，无公式）
   function getAttrEffect(buffId, level) {
@@ -93,7 +101,7 @@ window.DungeonBuff = (function () {
   function defaultHandlerFor(buffId) {
     var def = findDef(buffId);
     if (!def) throw new Error('未知 buffId: "' + buffId + '"');
-    switch (def.category || 'ATTR') {
+    switch (categoryOf(buffId)) {
       case 'ATTR':    return new AttrBuff(buffId);
       case 'INSTANT': return new InstantBuff(buffId);
       case 'PASSIVE': throw new Error('PASSIVE "' + buffId + '" 必须自注册子类');
@@ -118,7 +126,7 @@ window.DungeonBuff = (function () {
     var instance = {
       instanceId: buffId + '_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
       buffId: buffId,
-      category: def.category || 'ATTR',
+      category: categoryOf(buffId),
       level: options.level != null ? options.level : 1,
       remaining: options.remaining != null ? options.remaining
                : (def.remaining != null ? def.remaining : -1),
