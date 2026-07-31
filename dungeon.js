@@ -202,8 +202,16 @@ function dungeonTriggerCurse(){
   });
   if(available.length===0) return; // 所有诅咒满级
   const luk = getAttrEffect('luk', dungeonLevelOf('luk'));
-  // 运气降低高层诅咒概率(简化：运气越高越倾向选已有等级低的)
-  const picked = available[Math.floor(Math.random()*available.length)];
+  // 运气：以 luk 概率抑制高层诅咒——命中时改抽当前等级最低的诅咒
+  let picked;
+  if(Math.random() < luk){
+    let minLv = Infinity;
+    available.forEach(k=>{ const lv=dungeonLevelOf(k); if(lv<minLv) minLv=lv; });
+    const lowest = available.filter(k=>dungeonLevelOf(k)===minLv);
+    picked = lowest[Math.floor(Math.random()*lowest.length)];
+  } else {
+    picked = available[Math.floor(Math.random()*available.length)];
+  }
   dungeonAddLevel(picked, 1);
   dungeonShowCurseEffect(picked);
   dungeonRenderStateArea();

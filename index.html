@@ -2855,10 +2855,12 @@ function soloUpdateTimerBar(){
 
 function soloApplyWrongPenalty(){
   const p=soloWrongPenalty();
-  // flow rate penalty: 4th wrong onwards, +0.2 global flow each
+  const brvMult=(window.Dungeon && Dungeon.isActive())?Dungeon.getPenaltyMultiplier():1;
+  // flow rate penalty: 4th wrong onwards, +0.2 global flow each (勇气降低惩罚)
   if(S.wrongCount>=4){
-    S.globalFlowRate+=0.2;
-    S.wrongFlowPenalty+=0.2;
+    const fp=0.2*brvMult;
+    S.globalFlowRate+=fp;
+    S.wrongFlowPenalty+=fp;
     document.getElementById('soloTimerWrap').classList.add('flow-penalty');
   }
   // word time penalty: reduce current layer ms (cascade across layers)
@@ -2868,7 +2870,7 @@ function soloApplyWrongPenalty(){
     const preWidth=Math.max(0,S.wordTimerMs/4000*100);
     const preLayer=S.wordTimerLayer;
 
-    let ms=p.word*1000;
+    let ms=p.word*1000*brvMult;
     S.wordTimerMs-=ms;
     while(S.wordTimerMs<=0){
       S.wordTimerLayer--;
@@ -2906,7 +2908,7 @@ function soloApplyWrongPenalty(){
   // total time penalty
   if(p.total>0){
     if(!S.timeFractional)S.timeFractional=true;
-    S.timeLeft=Math.max(0,S.timeLeft-p.total);
+    S.timeLeft=Math.max(0,S.timeLeft-p.total*brvMult);
     soloUpdateTimerBar();
     if(S.timeLeft<=0)soloEndGame();
   }
