@@ -270,7 +270,7 @@ function dungeonEnterBoss(){
   }
   // 段位积分条外框变红
   const promoBar = document.querySelector('.solo-promo-bar');
-  if(promoBar) promoBar.style.border = '2px solid #e53935';
+  if(promoBar) promoBar.style.boxShadow = '0 0 0 2px #e53935';
 }
 
 function dungeonExitBoss(){
@@ -284,7 +284,7 @@ function dungeonExitBoss(){
   dungeonRenderStateArea();
   // 恢复积分条外框
   const promoBar = document.querySelector('.solo-promo-bar');
-  if(promoBar) promoBar.style.border = '';
+  if(promoBar) promoBar.style.boxShadow = '';
   // Boss额外金币
   dungeonAddGold(DUNGEON_CFG.goldPerBoss);
 }
@@ -297,10 +297,18 @@ function dungeonGetFlowRateMultiplier(){
   return Math.max(0.3, 1 - getAttrEffect('wis', dungeonLevelOf('wis')));
 }
 
-// 惩罚修正(勇气)
-function dungeonGetPenaltyMultiplier(){
-  if(!D.active) return 1;
-  return Math.max(0.2, 1 - getAttrEffect('brv', dungeonLevelOf('brv')));
+// 勇气减伤(brv)：最终伤害 = 原伤害 × (1 - 基础减伤系数 × 该惩罚修正)
+//   基础减伤系数 = brv 的 Lv{level} 列（随等级增）
+//   修正系数     = brv_mitigation[key].coeff（固定常量，配置表）
+function dungeonBrvMitigate(key, raw){
+  if(!D.active) return raw;
+  const base = getAttrEffect('brv', dungeonLevelOf('brv'));
+  if(base<=0) return raw;
+  const t = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  const row = t.brv_mitigation && t.brv_mitigation[key];
+  const coeff = (row && typeof row.coeff==='number') ? row.coeff : 0;
+  const reduce = Math.min(0.9, base * coeff); // 减伤上限 90%，避免归零
+  return raw * (1 - reduce);
 }
 
 // 段位积分额外加成(力量)
@@ -380,6 +388,7 @@ function dungeonRenderShop(){
   area.innerHTML = `
     <div class="dshop-header">
       <div class="dshop-title">强化</div>
+      <div class="dungeon-gold dshop-header-gold"><span class="dgold-num">${D.gold}</span>G</div>
     </div>
   `;
 
@@ -454,6 +463,7 @@ function dungeonAttrCardHTML(attrKey, currency){
   const cur     = currency.toUpperCase();
   return `
     <div class="dcard dcard-attr" data-attr="${attrKey}" data-price="${price}" data-cur="${cur}">
+      <div class="dcard-inner">
       <div class="dcard-body">
         <div class="dcard-row-top">
           <span class="dcard-cn">${cnName}</span>
@@ -469,6 +479,7 @@ function dungeonAttrCardHTML(attrKey, currency){
         <span class="dcard-cost-num">${price}</span>
         <span class="dcard-cost-unit">${cur}</span>
       </div>
+      </div>
     </div>`;
 }
 
@@ -478,6 +489,7 @@ function dungeonItemCardHTML(itemDef, currency){
   const price = dungeonPrice(itemDef.id) || itemDef.price || 0;
   return `
     <div class="dcard dcard-item" data-item="${itemDef.id}" data-price="${price}" data-cur="${cur}">
+      <div class="dcard-inner">
       <div class="dcard-body dcard-body-item">
         <div class="dcard-item-text">
           <span class="dcard-item-en">${itemDef.nameEn||itemDef.id}</span>
@@ -488,6 +500,7 @@ function dungeonItemCardHTML(itemDef, currency){
       <div class="dcard-cost dcard-cost-${cur.toLowerCase()}">
         <span class="dcard-cost-num">${price}</span>
         <span class="dcard-cost-unit">${cur}</span>
+      </div>
       </div>
     </div>`;
 }
@@ -611,6 +624,7 @@ const CURSE_COMBO_DEFS = [
 function dungeonCurseCardHTML(combo){
   return `
     <div class="dcard dcard-curse" data-item="${combo.itemId}" data-curse="${combo.curseKey}" data-curses="${combo.curses}">
+      <div class="dcard-inner">
       <div class="dcard-body dcard-body-curse">
         <div class="dcurse-half dcurse-item-half">
           <span class="dcurse-item-en">${combo.itemNameEn}</span>
@@ -622,6 +636,7 @@ function dungeonCurseCardHTML(combo){
           <span class="dcurse-curse-cn">${combo.curseName}</span>
           <span class="dcurse-curse-en">${combo.curseNameEn}</span>
         </div>
+      </div>
       </div>
     </div>`;
 }
@@ -835,7 +850,9 @@ function dungeonRenderGoldUI(){
   if(!el){
     el = document.createElement('div');
     el.id = 'dungeonGoldDisplay';
-    el.style.cssText = 'position:absolute;left:0;top:0;padding:4px 10px;background:#fff3cd;border:2px solid #ffc107;border-radius:8px;font-size:14px;font-weight:bold;color:#856404;';
+    el.className = 'dungeon-gold';
+    el.style.cssText = 'position:absolute;left:0;top:0;';
+    el.innerHTML = '<span class="dgold-num"></span>G';
     // Insert into .solo-promo-area (left of stage bar)
     const promoArea = document.querySelector('#soloPanel .solo-promo-area');
     if(promoArea){
@@ -844,7 +861,8 @@ function dungeonRenderGoldUI(){
     }
   }
   el.style.display = '';
-  el.textContent = D.gold + 'G';
+  // 同步所有金币数字（游戏内角标 + 商城头部）
+  document.querySelectorAll('.dgold-num').forEach(e=>{ e.textContent = D.gold; });
 }
 
 function dungeonRenderStressBar(){
@@ -856,7 +874,7 @@ function dungeonRenderStressBar(){
     el.style.cssText = 'width:100%;max-width:600px;display:flex;align-items:center;gap:0;margin:4px auto 0;';
     el.innerHTML = `
       <span id="dungeonStressLabel" style="font-size:11px;font-weight:900;color:#400060;letter-spacing:0.08em;white-space:nowrap;padding:0 6px 0 0;flex-shrink:0;">STRESS</span>
-      <div id="dungeonStressTrack" style="flex:1;height:18px;background:#e0e0e0;border:2px solid #400060;border-radius:0;overflow:hidden;position:relative;">
+      <div id="dungeonStressTrack" style="flex:1;height:18px;background:#e0e0e0;border:2px solid #fff;box-shadow:0 0 0 2px #400060;border-radius:9px;overflow:hidden;position:relative;">
         <div id="dungeonStressFill" style="height:100%;background:#9c27b0;width:0%;transition:width 0.3s;border-radius:0;"></div>
       </div>
     `;
@@ -918,10 +936,66 @@ function dungeonHideUI(){
   });
 }
 
-// ===== 卡片交互（野兽派 CSS hover 接管，JS层保留空函数兼容调用） =====
+// ===== 卡片交互（小丑牌式 3D 悬浮倾斜，事件委托，刷新后新卡自动生效） =====
+const DTILT_SELECTOR = '.dcard';
+const DTILT_MAX = 14;      // 最大倾斜角(度)
+const DTILT_PERSP = 700;   // 透视距离(px)
+function dungeonTiltTarget(el){
+  // .dcard 变换其上层卡面 .dcard-inner（阴影板 ::before 保持静止）；按钮直接变换自身
+  return el.classList.contains('dcard') ? (el.querySelector('.dcard-inner') || el) : el;
+}
+function dungeonTiltTransform(el, e, pressed){
+  const tgt = dungeonTiltTarget(el);
+  const r = el.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width  - 0.5; // -0.5..0.5
+  const py = (e.clientY - r.top)  / r.height - 0.5;
+  const rotY = px * DTILT_MAX * 2;
+  const rotX = -py * DTILT_MAX * 2;
+  const scale = pressed ? 0.95 : 1.06;
+  const lift  = pressed ? 2 : -6;
+  tgt.style.transition = 'transform 0s';
+  tgt.style.transform =
+    `perspective(${DTILT_PERSP}px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) `+
+    `scale(${scale}) translateY(${lift}px)`;
+  el.style.zIndex = '5';
+}
+function dungeonTiltReset(el){
+  const tgt = dungeonTiltTarget(el);
+  tgt.style.transition = 'transform 0.35s cubic-bezier(.2,.8,.3,1.3)';
+  tgt.style.transform = '';
+  el.style.zIndex = '';
+}
 function dungeonApplyCardTilt(container){
-  // 野兽派风格：hover 位移由 CSS .dcard:hover { transform:translate(4px,4px) } 控制
-  // JS tilt 已移除
+  if(!container || container._dtiltBound) return;
+  container._dtiltBound = true;
+  container.addEventListener('pointermove', e=>{
+    const el = e.target.closest(DTILT_SELECTOR);
+    if(!el || !container.contains(el)) return;
+    if(el.classList.contains('dcard-bought')) return;
+    dungeonTiltTransform(el, e, el._dpressed);
+  });
+  container.addEventListener('pointerout', e=>{
+    const el = e.target.closest(DTILT_SELECTOR);
+    if(!el) return;
+    // 仍在同一元素内部移动时 pointerout 会误触，排除之
+    if(e.relatedTarget && el.contains(e.relatedTarget)) return;
+    el._dpressed = false;
+    dungeonTiltReset(el);
+  });
+  container.addEventListener('pointerdown', e=>{
+    const el = e.target.closest(DTILT_SELECTOR);
+    if(!el || el.classList.contains('dcard-bought')) return;
+    el._dpressed = true;
+    dungeonTiltTransform(el, e, true);
+  });
+  const release = e=>{
+    const el = e.target.closest ? e.target.closest(DTILT_SELECTOR) : null;
+    if(el && el._dpressed){
+      el._dpressed = false;
+      dungeonTiltTransform(el, e, false);
+    }
+  };
+  container.addEventListener('pointerup', release);
 }
 const style = document.createElement('style');
 style.textContent = `
@@ -949,13 +1023,20 @@ style.textContent = `
 .dshop-header {
   width:100%;max-width:600px;
   display:flex;justify-content:center;align-items:center;
-  margin-bottom:14px;
+  margin-bottom:14px;position:relative;
 }
 .dshop-title {
   font-size:20px;font-weight:900;color:#111;
   text-transform:uppercase;letter-spacing:0.08em;
   border-bottom:4px solid #111;padding-bottom:2px;
 }
+.dungeon-gold {
+  display:inline-flex;align-items:center;
+  padding:3px 12px;
+  background:#ffc107;border:3px solid #6b4500;border-radius:10px;
+  font-size:16px;font-weight:900;color:#3d2800;line-height:1;
+}
+.dshop-header-gold { position:absolute;left:0;top:50%;transform:translateY(-50%); }
 
 /* ===== 交易区块 ===== */
 .dshop-section {
@@ -990,30 +1071,21 @@ style.textContent = `
 .dshop-section-label { font-size:14px;font-weight:900;color:#111;text-transform:uppercase;letter-spacing:0.05em; }
 
 .dshop-reroll {
-  padding:4px 10px;border-radius:0;
+  padding:5px 10px;border-radius:0;
   border:2px solid #3a3a3a;
   background:#fff;color:#111;font-size:12px;font-weight:900;
-  cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;
-  box-shadow:3px 3px 0px 0px #3a3a3a;
+  box-shadow:3px 3px 0 0 #3a3a3a;
+  cursor:pointer;transition:box-shadow 0.12s,transform 0.12s;
 }
-.dshop-reroll:hover {
-  box-shadow:2px 2px 0px 0px #3a3a3a;
-  transform:translate(1px,1px);
-}
-.dshop-reroll:active {
-  box-shadow:2px 2px 0px 0px #3a3a3a;
-  transform:translate(1px,1px);
-}
-.dshop-reroll.full-press {
-  box-shadow:none !important;
-  transform:translate(3px,3px) !important;
-}
+.dshop-reroll:hover,
+.dshop-reroll:active { box-shadow:1px 1px 0 0 #3a3a3a; transform:translate(1px,1px); }
+.dshop-reroll.full-press { box-shadow:none !important; transform:translate(3px,3px) !important; }
 .dshop-reroll-g { background:#ffc107; border-color:#6b4500; box-shadow:3px 3px 0 0 #6b4500; }
-.dshop-reroll-g:hover,.dshop-reroll-g:active { box-shadow:2px 2px 0 0 #6b4500; }
+.dshop-reroll-g:hover,.dshop-reroll-g:active { box-shadow:1px 1px 0 0 #6b4500; }
 .dshop-reroll-p { background:#64b5f6; border-color:#0d3172; box-shadow:3px 3px 0 0 #0d3172; }
-.dshop-reroll-p:hover,.dshop-reroll-p:active { box-shadow:2px 2px 0 0 #0d3172; }
+.dshop-reroll-p:hover,.dshop-reroll-p:active { box-shadow:1px 1px 0 0 #0d3172; }
 .dshop-reroll-t { background:#81c784; border-color:#1b4d28; box-shadow:3px 3px 0 0 #1b4d28; }
-.dshop-reroll-t:hover,.dshop-reroll-t:active { box-shadow:2px 2px 0 0 #1b4d28; }
+.dshop-reroll-t:hover,.dshop-reroll-t:active { box-shadow:1px 1px 0 0 #1b4d28; }
 
 /* ===== 卡片网格 ===== */
 .dshop-grid {
@@ -1024,48 +1096,52 @@ style.textContent = `
 .dshop-grid-2 { grid-template-columns:repeat(2,1fr); }
 
 /* ===== 商品卡片 ===== */
+/* .dcard = 外层定位槽（透明），::before = 下层静止阴影板，.dcard-inner = 上层卡面(3D倾斜目标) */
 .dcard {
-  border:3px solid #3a3a3a;border-radius:0;
-  background:#fff;overflow:hidden;
-  cursor:pointer;
-  display:flex;flex-direction:column;
+  position:relative;
   min-height:90px;
+  cursor:pointer;
   user-select:none;
-  box-shadow:4px 4px 0px 0px #3a3a3a;
-  transition:box-shadow 0.15s, transform 0.15s;
+}
+.dcard::before {
+  content:'';
+  position:absolute;
+  left:0;right:0;top:0;bottom:0;
+  background:#3a3a3a;
+  transform:translateY(4px);
+  transition:transform 0.12s;
+  z-index:0;
+}
+.dcard-inner {
+  position:relative;
+  z-index:1;
+  min-height:90px;
+  height:100%;
+  width:100%;
+  background:#fff;
+  border:3px solid #3a3a3a;
+  border-radius:0;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  transform-origin:center center;
   will-change:transform;
+  backface-visibility:hidden;
 }
-.dcard:hover {
-  box-shadow:3px 3px 0px 0px #3a3a3a;
-  transform:translate(1px,1px);
-}
-.dcard:active {
-  box-shadow:3px 3px 0px 0px #3a3a3a;
-  transform:translate(1px,1px);
-}
-.dcard.dcard-bought {
-  opacity:0.4;pointer-events:none;
-  transform:translate(4px,4px);
-  box-shadow:none;
-  filter:grayscale(0.6);
-}
-/* 各区块颜色偏向阴影+描边 */
-.dshop-section-g .dcard                     { box-shadow:4px 4px 0 0 #6b4500; border-color:#6b4500; }
-.dshop-section-g .dcard:hover,
-.dshop-section-g .dcard:active              { box-shadow:3px 3px 0 0 #6b4500; }
-.dshop-section-p .dcard                     { box-shadow:4px 4px 0 0 #0d3172; border-color:#0d3172; }
-.dshop-section-p .dcard:hover,
-.dshop-section-p .dcard:active              { box-shadow:3px 3px 0 0 #0d3172; }
-.dshop-section-t .dcard                     { box-shadow:4px 4px 0 0 #1b4d28; border-color:#1b4d28; }
-.dshop-section-t .dcard:hover,
-.dshop-section-t .dcard:active              { box-shadow:3px 3px 0 0 #1b4d28; }
-.dshop-section-c .dcard                     { box-shadow:4px 4px 0 0 #400060; border-color:#400060; }
-.dshop-section-c .dcard:hover,
-.dshop-section-c .dcard:active              { box-shadow:3px 3px 0 0 #400060; }
-.dshop-section-g .dcard.dcard-bought,
-.dshop-section-p .dcard.dcard-bought,
-.dshop-section-t .dcard.dcard-bought,
-.dshop-section-c .dcard.dcard-bought        { box-shadow:none; }
+/* 悬浮/点击的卡面位移与倾斜由 JS(dungeonApplyCardTilt) 接管；阴影板随状态加深/压平 */
+.dcard:hover::before  { transform:translateY(6px); }
+.dcard:active::before { transform:translateY(1px); }
+.dcard.dcard-bought   { pointer-events:none; }
+.dcard.dcard-bought::before { transform:translateY(1px); }
+.dcard.dcard-bought .dcard-inner { opacity:0.4;filter:grayscale(0.6); }
+/* 各区块颜色：阴影板 + 卡面描边 */
+.dshop-section-g .dcard::before   { background:#6b4500; }
+.dshop-section-g .dcard-inner     { border-color:#6b4500; }
+.dshop-section-p .dcard::before   { background:#0d3172; }
+.dshop-section-p .dcard-inner     { border-color:#0d3172; }
+.dshop-section-t .dcard::before   { background:#1b4d28; }
+.dshop-section-t .dcard-inner     { border-color:#1b4d28; }
+.dshop-section-c .dcard::before   { background:#400060; }
+.dshop-section-c .dcard-inner     { border-color:#400060; }
 
 /* ---- 属性升级卡体 ---- */
 .dcard-body {
@@ -1160,20 +1236,20 @@ style.textContent = `
 .dshop-footer { margin-top:14px;text-align:center; }
 .dshop-continue {
   padding:10px 32px;font-size:15px;
-  border:3px solid #7a4f00;border-radius:0;
+  border:2px solid #3a3a3a;border-radius:0;
   color:#111;cursor:pointer;font-weight:900;
-  background:#ffc107;
-  text-transform:uppercase;letter-spacing:0.06em;
-  box-shadow:5px 5px 0px 0px #7a4f00;
-  transition:box-shadow 0.15s,transform 0.15s;
+  background:#fff;
+  box-shadow:3px 3px 0 0 #3a3a3a;
+  transition:box-shadow 0.12s,transform 0.12s;
 }
 .dshop-continue:hover {
-  box-shadow:4px 4px 0px 0px #7a4f00;
+  box-shadow:1px 1px 0 0 #3a3a3a;
   transform:translate(1px,1px);
+  background:#f0f0f0;
 }
 .dshop-continue:active {
   box-shadow:none;
-  transform:translate(5px,5px);
+  transform:translate(3px,3px);
 }
 `;
 document.head.appendChild(style);
@@ -1199,7 +1275,7 @@ window.Dungeon = {
   shouldShowShop: dungeonShouldShowShop,
   openShop: dungeonOpenShop,
   getFlowRateMultiplier: dungeonGetFlowRateMultiplier,
-  getPenaltyMultiplier: dungeonGetPenaltyMultiplier,
+  brvMitigate: dungeonBrvMitigate,
   getPromoScoreBonus: dungeonGetPromoScoreBonus,
   getShinyBonus: dungeonGetShinyBonus,
   getFatigueReduction: dungeonGetFatigueReduction,

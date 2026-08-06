@@ -2,8 +2,8 @@
 // 源文件: GW配置表.xlsx
 // 用法: <script src="game_dungeon_data.js"></script> 后读 window.DUNGEON_DATA
 window.DUNGEON_DATA = {
-  "version": "20260731.104254",
-  "generatedAt": "2026-07-31T10:42:54",
+  "version": "20260805.231721",
+  "generatedAt": "2026-08-05T23:17:21",
   "source": "GW配置表.xlsx",
   "tables": {
     "attr_config": {
@@ -342,6 +342,33 @@ window.DUNGEON_DATA = {
         "key": "rerollPriceC",
         "desc": "C区刷新价格",
         "value": 1
+      }
+    },
+    "brv_mitigation": {
+      "wrongCooldown": {
+        "key": "wrongCooldown",
+        "desc": "错牌冷却时长",
+        "coeff": 1
+      },
+      "wordTime": {
+        "key": "wordTime",
+        "desc": "单词层扣时",
+        "coeff": 1
+      },
+      "totalTime": {
+        "key": "totalTime",
+        "desc": "总时间扣时",
+        "coeff": 1
+      },
+      "wrongFlow": {
+        "key": "wrongFlow",
+        "desc": "错牌流速增加",
+        "coeff": 1
+      },
+      "wrongStress": {
+        "key": "wrongStress",
+        "desc": "错牌地牢压力累计",
+        "coeff": 1
       }
     }
   }

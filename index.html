@@ -1175,7 +1175,7 @@ body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; background:#f5f5f5
 }
 
 /* ── 段位积分条 ── */
-.solo-promo-bar { border-radius: 0; border: 2px solid #3a3a3a; height: 18px !important; }
+.solo-promo-bar { border-radius: 9px; border: 2px solid #fff; box-shadow:0 0 0 2px #3a3a3a; height: 18px !important; }
 .solo-promo-fill { border-radius: 0; }
 
 /* ── 词语计时条 ── */
@@ -2855,10 +2855,10 @@ function soloUpdateTimerBar(){
 
 function soloApplyWrongPenalty(){
   const p=soloWrongPenalty();
-  const brvMult=(window.Dungeon && Dungeon.isActive())?Dungeon.getPenaltyMultiplier():1;
-  // flow rate penalty: 4th wrong onwards, +0.2 global flow each (勇气降低惩罚)
+  const dgn=(window.Dungeon && Dungeon.isActive());
+  // flow rate penalty: 4th wrong onwards, +0.2 global flow each (勇气减伤·wrongFlow)
   if(S.wrongCount>=4){
-    const fp=0.2*brvMult;
+    const fp=dgn?Dungeon.brvMitigate('wrongFlow',0.2):0.2;
     S.globalFlowRate+=fp;
     S.wrongFlowPenalty+=fp;
     document.getElementById('soloTimerWrap').classList.add('flow-penalty');
@@ -2870,7 +2870,7 @@ function soloApplyWrongPenalty(){
     const preWidth=Math.max(0,S.wordTimerMs/4000*100);
     const preLayer=S.wordTimerLayer;
 
-    let ms=p.word*1000*brvMult;
+    let ms=dgn?Dungeon.brvMitigate('wordTime',p.word*1000):p.word*1000;
     S.wordTimerMs-=ms;
     while(S.wordTimerMs<=0){
       S.wordTimerLayer--;
@@ -2908,7 +2908,8 @@ function soloApplyWrongPenalty(){
   // total time penalty
   if(p.total>0){
     if(!S.timeFractional)S.timeFractional=true;
-    S.timeLeft=Math.max(0,S.timeLeft-p.total*brvMult);
+    const totalPen=dgn?Dungeon.brvMitigate('totalTime',p.total):p.total;
+    S.timeLeft=Math.max(0,S.timeLeft-totalPen);
     soloUpdateTimerBar();
     if(S.timeLeft<=0)soloEndGame();
   }
@@ -3083,12 +3084,13 @@ function soloPlayCard(idx){
     container.classList.add('penalty');
     // time penalties (初中级 onwards)
     S.wrongCount++;
-    const cd=S.wrongCount>=3?1000:500;
+    let cd=S.wrongCount>=3?1000:500;
+    if(window.Dungeon && Dungeon.isActive()) cd=Dungeon.brvMitigate('wrongCooldown', cd);
     setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');},cd);
     soloApplyWrongPenalty();
-    // 地牢：错牌压力(第3次起累计)
+    // 地牢：错牌压力(第3次起累计) — 勇气减伤
     if(window.Dungeon && Dungeon.isActive() && S.wrongCount>=3){
-      Dungeon.addStress(S.wrongCount - 2);
+      Dungeon.addStress(Dungeon.brvMitigate('wrongStress', S.wrongCount - 2));
     }
     if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'WRONG',{});
     return;
