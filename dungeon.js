@@ -1108,6 +1108,7 @@ style.textContent = `
   position:absolute;
   left:0;right:0;top:0;bottom:0;
   background:#3a3a3a;
+  border-radius:5px;
   transform:translateY(4px);
   transition:transform 0.12s;
   z-index:0;
@@ -1119,8 +1120,9 @@ style.textContent = `
   height:100%;
   width:100%;
   background:#fff;
+  --dedge:#3a3a3a;
   border:3px solid #3a3a3a;
-  border-radius:0;
+  border-radius:5px;
   overflow:hidden;
   display:flex;flex-direction:column;
   transform-origin:center center;
@@ -1133,15 +1135,15 @@ style.textContent = `
 .dcard.dcard-bought   { pointer-events:none; }
 .dcard.dcard-bought::before { transform:translateY(1px); }
 .dcard.dcard-bought .dcard-inner { opacity:0.4;filter:grayscale(0.6); }
-/* 各区块颜色：阴影板 + 卡面描边 */
+/* 各区块颜色：阴影板 + 卡面描边 + 接缝三角(--dedge) */
 .dshop-section-g .dcard::before   { background:#6b4500; }
-.dshop-section-g .dcard-inner     { border-color:#6b4500; }
+.dshop-section-g .dcard-inner     { border-color:#6b4500; --dedge:#6b4500; }
 .dshop-section-p .dcard::before   { background:#0d3172; }
-.dshop-section-p .dcard-inner     { border-color:#0d3172; }
+.dshop-section-p .dcard-inner     { border-color:#0d3172; --dedge:#0d3172; }
 .dshop-section-t .dcard::before   { background:#1b4d28; }
-.dshop-section-t .dcard-inner     { border-color:#1b4d28; }
+.dshop-section-t .dcard-inner     { border-color:#1b4d28; --dedge:#1b4d28; }
 .dshop-section-c .dcard::before   { background:#400060; }
-.dshop-section-c .dcard-inner     { border-color:#400060; }
+.dshop-section-c .dcard-inner     { border-color:#400060; --dedge:#400060; }
 
 /* ---- 属性升级卡体 ---- */
 .dcard-body {
@@ -1183,9 +1185,9 @@ style.textContent = `
 
 /* ---- 费用条 ---- */
 .dcard-cost {
+  position:relative;
   display:flex;align-items:center;justify-content:flex-end;gap:6px;
   padding:5px 10px;
-  border-top:3px solid #111;
   background:#f0f0f0;
   font-weight:900;
 }
@@ -1194,14 +1196,27 @@ style.textContent = `
 /* 刷新按钮不可负担时数字红色 */
 .dshop-reroll.unaffordable { color:#e53935 !important; }
 .dcard-cost-unit { font-size:15px; }
-.dcard-cost-g { background:#fff3cd;border-top-color:#111; }
+.dcard-cost-g { background:#fff3cd; }
 .dcard-cost-g .dcard-cost-unit { color:#7a5900; }
-.dcard-cost-p { background:#dceefb;border-top-color:#111; }
+.dcard-cost-p { background:#dceefb; }
 .dcard-cost-p .dcard-cost-unit { color:#0d47a1; }
-.dcard-cost-t { background:#d9f2d9;border-top-color:#111; }
+.dcard-cost-t { background:#d9f2d9; }
 .dcard-cost-t .dcard-cost-unit { color:#1b5e20; }
-.dcard-cost-c { background:#f3e5f5;border-top-color:#111; }
+.dcard-cost-c { background:#f3e5f5; }
 .dcard-cost-c .dcard-cost-unit { color:#4a148c; }
+/* 接缝两侧横置等腰三角形（指向中心），颜色取各区边框色 */
+.dcard-cost::before,
+.dcard-cost::after {
+  content:'';
+  position:absolute;
+  top:0;
+  width:0;height:0;
+  border-top:7px solid transparent;
+  border-bottom:7px solid transparent;
+  transform:translateY(-50%);
+}
+.dcard-cost::before { left:0;  border-left:9px solid var(--dedge,#3a3a3a); }
+.dcard-cost::after  { right:0; border-right:9px solid var(--dedge,#3a3a3a); }
 
 /* ---- 诅咒组合卡 ---- */
 .dcard-body-curse {
@@ -1259,6 +1274,71 @@ function shuffle(arr){
   for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
   return arr;
 }
+
+// ===== 测试作弊指令（控制台调用）=====
+// n=数值；v=buffKey（属性/道具/诅咒统称 buff）
+function dungeonBuffCategory(v){
+  var t = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  if(t.attr_config  && t.attr_config[v])  return 'ATTR';
+  if(t.curse_config && t.curse_config[v]) return 'CURSE';
+  if(t.item_config  && t.item_config[v])  return t.item_config[v].category || 'PASSIVE';
+  return null;
+}
+function dungeonItemDef(v){
+  var t = (typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {};
+  return (t.item_config && t.item_config[v]) || null;
+}
+// 加金币
+window.get_gold = function(n){
+  n = Number(n) || 0;
+  D.gold += n;
+  dungeonRenderGoldUI();
+  return 'gold += ' + n + ' → ' + D.gold;
+};
+// 加 buff（属性/道具/诅咒）
+window.get_buff = function(v){
+  if(typeof DungeonBuff==='undefined') return 'buff 系统未加载';
+  var cat = dungeonBuffCategory(v);
+  if(!cat) return '未找到 buff：' + v;
+  if(cat==='ATTR' || cat==='CURSE'){
+    var cur = dungeonLevelOf(v);
+    var mx  = dungeonMaxLevelOf(v); // 0 = 无上限
+    if(mx>0 && cur>=mx) return v + ' 已达上限 Lv' + mx + '，不再叠加';
+    dungeonAddLevel(v, 1);
+    dungeonRenderStateArea();
+    dungeonApplyCurseEffects();
+    return v + ' → Lv' + dungeonLevelOf(v);
+  }
+  // PASSIVE / INSTANT 道具
+  var def = dungeonItemDef(v) || {};
+  var repeatable = def.repeatable===1 || def.repeatable===true;
+  if(!repeatable && D.buffs.some(function(b){ return b.buffId===v; })){
+    return v + ' 不可重复购买且已拥有，不再叠加';
+  }
+  DungeonBuff.addBuff(D, v);
+  dungeonRenderStateArea();
+  dungeonApplyCurseEffects();
+  return '已添加 ' + v;
+};
+// 移除 buff（身上没有对应 key 则不执行）
+window.lost_buff = function(v){
+  if(typeof DungeonBuff==='undefined') return 'buff 系统未加载';
+  var cat = dungeonBuffCategory(v);
+  if(!cat) return '未知 buff：' + v;
+  if(cat==='ATTR' || cat==='CURSE'){
+    if(dungeonLevelOf(v)<=0) return '身上没有 ' + v + '，不执行';
+    dungeonAddLevel(v, -1);
+    dungeonRenderStateArea();
+    dungeonApplyCurseEffects();
+    return v + ' → Lv' + dungeonLevelOf(v);
+  }
+  var inst = D.buffs.find(function(b){ return b.buffId===v; });
+  if(!inst) return '身上没有 ' + v + '，不执行';
+  DungeonBuff.removeBuff(D, inst.instanceId);
+  dungeonRenderStateArea();
+  dungeonApplyCurseEffects();
+  return '已移除 ' + v;
+};
 
 // ===== 暴露全局接口供主文件调用 =====
 window.Dungeon = {

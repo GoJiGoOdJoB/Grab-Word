@@ -283,29 +283,45 @@ body {
 .card {
   width: clamp(42px, 12vw, 76px);
   height: clamp(54px, 15vw, 96px);
-  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: opacity 0.25s, transform 0.25s;
+}
+/* 上层卡面（3D 倾斜目标） */
+.card-inner {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: clamp(20px, 6vw, 38px);
-  font-weight: bold;
+  font-weight: 900;
   text-transform: lowercase;
-  cursor: pointer;
-  transition: all 0.25s;
-  user-select: none;
-  position: relative;
-}
-.split.left .card {
   background: #fff;
-  border: 2px solid #2178d2;
-  color: #2178d2;
+  border-radius: 5px;
+  transform-origin: center center;
+  will-change: transform;
+  backface-visibility: hidden;
 }
-.split.right .card {
-  background: #fff;
-  border: 2px solid #d4a800;
-  color: #b8960a;
+/* 下层静止阴影板（数量随卡片天然同步） */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  transform: translateY(4px);
+  transition: transform 0.12s;
+  z-index: 0;
 }
+.split.left  .card-inner  { border: 2px solid #0d3172; color: #2178d2; }
+.split.left  .card::before { background: #0d3172; }
+.split.right .card-inner  { border: 2px solid #7a4f00; color: #b8960a; }
+.split.right .card::before { background: #7a4f00; }
+.solo-cards-section .card-inner  { border: 2px solid #0d3172; color: #2178d2; }
+.solo-cards-section .card::before { background: #0d3172; }
 .card .key-hint {
   position: absolute;
   top: 100%;
@@ -313,16 +329,25 @@ body {
   font-size: 10px;
   opacity: 0.45;
   font-weight: normal;
+  color: inherit;
 }
-.card:hover { transform: translateY(-3px); }
+/* 悬浮/点击的卡面位移由 JS 倾斜接管；阴影板随状态加深/压平 */
+.card:hover::before  { transform: translateY(6px); }
+.card:active::before { transform: translateY(1px); }
 .card.cooldown { opacity: 0.35; }
-.card.shake-card { animation: cardShake 0.3s; border-color: #f44336 !important; }
+.card.shake-card .card-inner { animation: cardShake 0.3s; border-color: #f44336 !important; color: #f44336 !important; }
 .card.used { opacity: 0; pointer-events: none; transform: scale(0.6) translateY(-10px); }
+.card.used::before { opacity: 0; }
 .card.discarding { opacity: 0; transform: scale(0.5) translateY(20px); transition: all 0.3s; }
 .card.flying-out { animation: cardFlyOut 0.25s ease forwards; pointer-events: none; }
 .card.drawing { animation: cardDraw 0.3s ease forwards; }
 .hand-cards.penalty .card { opacity: 0.3; pointer-events: none; filter: grayscale(1); transition: all 0.15s; }
 .hand-cards.passed .card { opacity: 0.25; pointer-events: none; filter: grayscale(1); transition: all 0.2s; }
+/* 错牌的那张卡：惩罚期间保持不透明、可 hover、抬高层级，突出"这张错了" */
+.hand-cards.penalty .card.wrong-card { opacity: 1 !important; filter: none !important; pointer-events: auto !important; }
+.card.wrong-card { z-index: 20; }
+/* 静息悬浮基态：鼠标悬停无需移动即浮起（抖动结束后立即回浮）；JS 倾斜会在移动时叠加旋转覆盖此基态 */
+.card:hover .card-inner { transform: perspective(600px) translateY(-5px) scale(1.1); transition: transform 0.2s; }
 
 .pass-btn {
   margin-top: 6px;
@@ -717,7 +742,7 @@ body {
 .case-toggle.uppercase .case-a { color: rgba(0,0,0,0.2); }
 
 body.uppercase-mode .letter-slot,
-body.uppercase-mode .card { text-transform: uppercase; }
+body.uppercase-mode .card-inner { text-transform: uppercase; }
 
 .score-card-area { display:none; width:min(320px,80vw); margin-top:8px; }
 .score-card {
@@ -844,7 +869,13 @@ body.uppercase-mode .card { text-transform: uppercase; }
 @keyframes settleReveal { 0%{transform:scale(3);opacity:0} 60%{transform:scale(0.9);opacity:1} 100%{transform:scale(1);opacity:1} }
 
 @keyframes bling { 0%{transform:scale(1)} 50%{transform:scale(1.2);box-shadow:0 0 12px rgba(33,120,210,0.4)} 100%{transform:scale(1)} }
-@keyframes cardShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+@keyframes cardShake {
+  0%,100%{ transform: translateY(-6px) scale(1.06) rotate(0deg); }
+  20%{ transform: translateY(-6px) scale(1.06) rotate(-6deg); }
+  40%{ transform: translateY(-6px) scale(1.06) rotate(5deg); }
+  60%{ transform: translateY(-6px) scale(1.06) rotate(-4deg); }
+  80%{ transform: translateY(-6px) scale(1.06) rotate(2deg); }
+}
 @keyframes shake { 0%,100%{transform:translate(-50%,-50%) translateX(0)} 25%{transform:translate(-50%,-50%) translateX(-2px)} 75%{transform:translate(-50%,-50%) translateX(2px)} }
 @keyframes slideIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
@@ -888,8 +919,8 @@ body.uppercase-mode .card { text-transform: uppercase; }
 .solo-word-section.shiny { background:linear-gradient(135deg,#e0f7fa,#fff,#e8daef,#d1c4e9,#e0f7fa); background-size:300% 300%; animation:shinyBg 3s ease infinite; border-color:#b39ddb; box-shadow:0 0 15px rgba(179,157,219,0.3); }
 .solo-word-section.transitioning .current-word { opacity:0; transform:translateY(-8px); }
 .solo-word-section.entering .current-word { opacity:1; transform:translateY(0); }
-.solo-cards-section { width:100%; max-width:600px; display:flex; flex-direction:column; align-items:center; gap:4px; }
-.solo-cards-section .card { background:#fff; border:2px solid #2178d2; color:#2178d2; }
+.solo-cards-section { width:100%; max-width:600px; display:flex; flex-direction:column; align-items:center; gap:4px; position:relative; z-index:15; }
+.solo-cards-section .card-inner { background:#fff; }
 .solo-book-section { width:100%; max-width:600px; display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border:1px solid #e0e0e0; border-radius:8px; background:#fff; min-height:38px; flex:1; overflow:hidden; min-height:0; }
 .solo-book-section .wordbook-item { }
 .solo-combo-box { position:absolute; top:46px; right:max(20px, calc(50% - 300px)); font-size:36px; font-weight:900; color:#e53935; z-index:50; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
@@ -1087,34 +1118,7 @@ body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; background:#f5f5f5
 .letter-slot { border-radius: 0; }
 .letter-slot.next-slot { border-color: #2178d2; }
 
-/* ── 手牌卡片 ── */
-.card {
-  border-radius: 0;
-  font-weight: 900;
-  transition: box-shadow 0.12s, transform 0.12s;
-}
-.split.left .card {
-  border: 2px solid #0d3172;
-  box-shadow: 3px 3px 0 0 #0d3172;
-}
-.split.right .card {
-  border: 2px solid #7a4f00;
-  box-shadow: 3px 3px 0 0 #7a4f00;
-}
-.solo-cards-section .card {
-  border: 2px solid #0d3172;
-  box-shadow: 3px 3px 0 0 #0d3172;
-}
-.card:hover {
-  transform: translate(1px,1px) !important;
-}
-.split.left .card:hover  { box-shadow: 2px 2px 0 0 #0d3172; }
-.split.right .card:hover { box-shadow: 2px 2px 0 0 #7a4f00; }
-.solo-cards-section .card:hover { box-shadow: 2px 2px 0 0 #0d3172; }
-.card:active { transform: translate(3px,3px) !important; }
-.split.left .card:active  { box-shadow: none !important; }
-.split.right .card:active { box-shadow: none !important; }
-.solo-cards-section .card:active { box-shadow: none !important; }
+/* ── 手牌卡片：样式已迁移到基础 .card / .card-inner / .card::before 分层实现 ── */
 
 /* ── PASS 按钮 ── */
 .pass-btn {
@@ -1809,12 +1813,55 @@ function renderWord(container){
   });
 }
 
+// ===== 手牌小丑牌式 3D 悬浮倾斜（事件委托，卡面 .card-inner 变换，阴影板 ::before 静止） =====
+function bindCardTilt(container){
+  if(!container||container._cardTiltBound)return;
+  container._cardTiltBound=true;
+  const MAX=12, PERSP=600;
+  const innerOf=el=>el.querySelector('.card-inner');
+  const apply=(el,e,pressed)=>{
+    const inner=innerOf(el); if(!inner)return;
+    const r=el.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width-0.5;
+    const py=(e.clientY-r.top)/r.height-0.5;
+    const rotY=px*MAX*2, rotX=-py*MAX*2;
+    const scale=pressed?0.94:1.1;
+    const lift=pressed?1:-5;
+    inner.style.transition='transform 0s';
+    inner.style.transform=`perspective(${PERSP}px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) scale(${scale}) translateY(${lift}px)`;
+    el.style.zIndex='5';
+  };
+  const reset=el=>{
+    const inner=innerOf(el); if(!inner)return;
+    inner.style.transition='transform 0.35s cubic-bezier(.2,.8,.3,1.3)';
+    inner.style.transform='';
+    el.style.zIndex='';
+  };
+  container.addEventListener('pointermove',e=>{
+    const el=e.target.closest('.card'); if(!el||!container.contains(el))return;
+    if(el.classList.contains('used')||el.classList.contains('cooldown')||el.classList.contains('shake-card'))return;
+    apply(el,e,el._pressed);
+  });
+  container.addEventListener('pointerout',e=>{
+    const el=e.target.closest('.card'); if(!el)return;
+    if(e.relatedTarget&&el.contains(e.relatedTarget))return;
+    el._pressed=false; reset(el);
+  });
+  container.addEventListener('pointerdown',e=>{
+    const el=e.target.closest('.card'); if(!el||el.classList.contains('used')||el.classList.contains('shake-card'))return;
+    el._pressed=true; apply(el,e,true);
+  });
+  container.addEventListener('pointerup',e=>{
+    const el=e.target.closest('.card'); if(el&&el._pressed){el._pressed=false; apply(el,e,false);}
+  });
+}
+
 function renderHands(){
   const c1=document.getElementById('p1Hand');c1.innerHTML='';
   G.p1Hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys1[i]||''}</span>`;
+    div.innerHTML=`<div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys1[i]||''}</span></div>`;
     div.onclick=()=>playCard('p1',i);
     c1.appendChild(div);
   });
@@ -1822,10 +1869,11 @@ function renderHands(){
   G.p2Hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys2[i]||''}</span>`;
+    div.innerHTML=`<div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys2[i]||''}</span></div>`;
     div.onclick=()=>playCard('p2',i);
     c2.appendChild(div);
   });
+  bindCardTilt(c1); bindCardTilt(c2);
 }
 
 function renderWordStars(container, baseCount, isShiny){
@@ -1888,7 +1936,7 @@ function playCard(player,idx){
   if(G.slots[nextBlank].letter!==letter){
     const container=document.getElementById(isP1?'p1Hand':'p2Hand');
     const cardEl=container.children[idx];
-    if(cardEl){cardEl.classList.add('shake-card');setTimeout(()=>cardEl.classList.remove('shake-card'),300);}
+    if(cardEl){cardEl.classList.add('shake-card','wrong-card');const _in=cardEl.querySelector('.card-inner');if(_in){_in.style.transition='';_in.style.transform='';}setTimeout(()=>cardEl.classList.remove('shake-card'),300);setTimeout(()=>cardEl.classList.remove('wrong-card'),700);}
     playSound(200,0.08);
     // penalty cooldown 0.7s - grey out all cards
     if(isP1){G.p1Cooldown=true;container.classList.add('penalty');setTimeout(()=>{G.p1Cooldown=false;container.classList.remove('penalty');},700);}
@@ -3061,10 +3109,11 @@ function soloRenderHand(){
   S.hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`${(l||'').toUpperCase()}<span class="key-hint">${keys[i]||''}</span>`;
+    div.innerHTML=`<div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${keys[i]||''}</span></div>`;
     div.onclick=()=>soloPlayCard(i);
     c.appendChild(div);
   });
+  bindCardTilt(c);
 }
 
 function soloPlayCard(idx){
@@ -3077,7 +3126,7 @@ function soloPlayCard(idx){
   if(S.slots[nextBlank].letter!==letter){
     const container=document.getElementById('soloHand');
     const cardEl=container.children[idx];
-    if(cardEl){cardEl.classList.add('shake-card');setTimeout(()=>cardEl.classList.remove('shake-card'),300);}
+    if(cardEl){cardEl.classList.add('shake-card','wrong-card');const _in=cardEl.querySelector('.card-inner');if(_in){_in.style.transition='';_in.style.transform='';}setTimeout(()=>cardEl.classList.remove('shake-card'),300);}
     playSound(200,0.08);
     // wrong penalty: cooldown 0.5s, upgrades to 1s on 3rd+ wrong
     S.cooldown=true;
@@ -3086,7 +3135,7 @@ function soloPlayCard(idx){
     S.wrongCount++;
     let cd=S.wrongCount>=3?1000:500;
     if(window.Dungeon && Dungeon.isActive()) cd=Dungeon.brvMitigate('wrongCooldown', cd);
-    setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');},cd);
+    setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');if(cardEl)cardEl.classList.remove('wrong-card');},cd);
     soloApplyWrongPenalty();
     // 地牢：错牌压力(第3次起累计) — 勇气减伤
     if(window.Dungeon && Dungeon.isActive() && S.wrongCount>=3){
@@ -3712,6 +3761,13 @@ window.shop=function(stageIdx){
   if(!Dungeon.isActive()) Dungeon.init();
   Dungeon.openShop();
   return 'Shop opened at stageIdx='+S.stageIdx;
+};
+// 加时间（通用，不限地牢）：n=秒
+window.get_time=function(n){
+  n=Number(n)||0;
+  S.timeLeft=Math.max(0,(S.timeLeft||0)+n);
+  if(typeof soloUpdateTimerBar==='function')soloUpdateTimerBar();
+  return 'time += '+n+' → '+S.timeLeft;
 };
 
 // default to solo tower on load
