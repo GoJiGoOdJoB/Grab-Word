@@ -240,12 +240,14 @@ body {
 
 .word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; max-width:123px; margin:0 auto; }
 .word-star { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; }
-.word-stars .word-star:nth-child(-n+5) { transform:translateY(-23px); }
+.word-stars .word-star:nth-child(-n+5) { transform:translateY(-11px); }
+.word-stars .word-star:nth-child(n+6) { transform:translateX(11.5px); }
 .word-star svg { filter:drop-shadow(0 0 1px rgba(0,0,0,0.2)); }
 .word-star.normal svg polygon { fill:#999; stroke:#fff; stroke-width:1.5; }
 .word-star.shiny-star svg polygon { fill:#7e57c2; stroke:#fff; stroke-width:1.5; }
 .word-hint-below { font-size: 18px; color: rgba(0,0,0,0.45); }
-.word-rule-below { font-size: 11px; color: rgba(0,0,0,0.25); }
+.word-pos-tags { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-top:6px; }
+.word-pos-tag { padding:2px 10px; border-radius:10px; font-size:12px; font-weight:bold; color:#fff; line-height:1.5; white-space:nowrap; }
 
 .word-section.shiny {
   background: linear-gradient(135deg, #e0f7fa, #fff, #e8daef, #d1c4e9, #e0f7fa);
@@ -1283,7 +1285,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
     <div class="word-chinese-top cn-top-sync"></div>
     <div class="current-word word-sync"></div>
     <div class="word-hint-below hint-sync"></div>
-    <div class="word-rule-below">从左往右依次填入</div>
+    <div class="word-pos-tags pos-sync"></div>
     <div class="word-status status-sync"></div>
   </div>
 </div>
@@ -1350,7 +1352,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
     <div class="word-chinese-top" id="soloCnTop"></div>
     <div class="current-word" id="soloWord"></div>
     <div class="word-hint-below" id="soloHint"></div>
-    <div class="word-rule-below">从左往右依次填入</div>
+    <div class="word-pos-tags" id="soloPos"></div>
     <div class="solo-word-timer"><div class="solo-word-timer-ghost" id="soloWordTimerGhost"></div><div class="solo-word-timer-fill" id="soloWordTimerFill"></div></div>
   </div>
   <div class="word-status" id="soloStatus"></div>
@@ -1456,6 +1458,12 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
               <button class="settings-lib-btn" disabled onclick="exportLib('hard')">导出</button>
               <button class="settings-lib-del" data-lib="hard" onclick="confirmDelete('lib-hard')" style="display:none">✕</button>
             </div>
+            <div class="settings-lib-label">无尽</div>
+            <div class="settings-lib-btns">
+              <button class="settings-lib-btn" disabled onclick="importLib('endless')">导入</button>
+              <button class="settings-lib-btn" disabled onclick="exportLib('endless')">导出</button>
+              <button class="settings-lib-del" data-lib="endless" onclick="confirmDelete('lib-endless')" style="display:none">✕</button>
+            </div>
           </div>
         </div>
         <div class="settings-page" id="settingsPageCache">
@@ -1523,14 +1531,14 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
 
 <script>
 // Banks
-let WORDS_EASY=[], WORDS_MED=[], WORDS_HARD=[];
+let WORDS_EASY=[], WORDS_MED=[], WORDS_HARD=[], WORDS_ENDLESS=[];
 let HAND_POOL='abcdefghijklmnopqrstuvwxyz'.split('');
-let WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
+let WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD,endless:WORDS_ENDLESS};
 let wordsLoaded=false;
 fetch('words.json').then(r=>r.json()).then(data=>{
-  WORDS_EASY=data.easy;WORDS_MED=data.medium;WORDS_HARD=data.hard;
+  WORDS_EASY=data.easy;WORDS_MED=data.medium;WORDS_HARD=data.hard;WORDS_ENDLESS=data.endless||data.hard;
   if(data.hand&&data.hand.length>0)HAND_POOL=data.hand;
-  WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD};
+  WORDS_MAP={easy:WORDS_EASY,medium:WORDS_MED,hard:WORDS_HARD,endless:WORDS_ENDLESS};
   wordsLoaded=true;
 }).catch(e=>console.error('词库加载失败',e));
 
@@ -1888,11 +1896,24 @@ function renderWordStars(container, baseCount, isShiny){
   }
 }
 
+function renderPosTags(posStr){
+  if(!posStr) return '';
+  const list=posStr.split('/').map(s=>s.trim()).filter(Boolean);
+  if(list.length===0) return '';
+  let hash=0;
+  for(let i=0;i<posStr.length;i++) hash=(hash*31+posStr.charCodeAt(i))&0xffff;
+  return list.map((p,i)=>{
+    const hue=Math.round((hash*0.5 + i*137.5)%360);
+    return `<span class="word-pos-tag" style="background:hsl(${hue},62%,48%);">${p}</span>`;
+  }).join('');
+}
+
 function renderAll(){
   const hasAnyPre=G.slots.some(s=>s.filledBy==='pre');
   const showCnTop=!hasAnyPre;
   document.querySelectorAll('.cn-top-sync').forEach(el=>el.textContent=showCnTop?G.currentWord.cn:'');
   document.querySelectorAll('.hint-sync').forEach(el=>el.textContent=showCnTop?'':G.currentWord.cn);
+  document.querySelectorAll('.pos-sync').forEach(el=>el.innerHTML=renderPosTags(G.currentWord.pos));
   document.querySelectorAll('.word-sync').forEach(c=>renderWord(c));
   document.querySelectorAll('.status-sync').forEach(el=>{el.textContent='';el.style.color='';});
   // shiny effect
@@ -2363,7 +2384,7 @@ function onLibToggle(){
 function updateLibDelButtons(){
   const save=loadSave();
   const priv=save.privateLib||{};
-  ['hand','easy','medium','hard'].forEach(key=>{
+  ['hand','easy','medium','hard','endless'].forEach(key=>{
     const btn=document.querySelector(`.settings-lib-del[data-lib="${key}"]`);
     if(!btn)return;
     const has=key==='hand'?(priv.hand&&priv.hand.length>0):(priv[key]&&priv[key].length>0);
@@ -2441,7 +2462,7 @@ function importSave(){
 
 // ===== localStorage =====
 const STORAGE_KEY='grabword_save';
-const APP_VERSION='a00001';
+const APP_VERSION='a00002';
 function loadSave(){
   try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch(e){return {};}
 }
@@ -2588,7 +2609,8 @@ function getEffectiveWords(){
   return {
     easy: (priv.easy&&priv.easy.length>0)? priv.easy : WORDS_MAP.easy,
     medium: (priv.medium&&priv.medium.length>0)? priv.medium : WORDS_MAP.medium,
-    hard: (priv.hard&&priv.hard.length>0)? priv.hard : WORDS_MAP.hard
+    hard: (priv.hard&&priv.hard.length>0)? priv.hard : WORDS_MAP.hard,
+    endless: (priv.endless&&priv.endless.length>0)? priv.endless : WORDS_MAP.endless
   };
 }
 
@@ -2605,7 +2627,7 @@ function getEffectiveHand(){
 function exportLib(level){
   const save=loadSave();
   const priv=save.privateLib||{};
-  const names={hand:'手牌',easy:'小学级',medium:'初中级',hard:'高中级'};
+  const names={hand:'手牌',easy:'小学级',medium:'初中级',hard:'高中级',endless:'无尽'};
   if(level==='hand'){
     let pool=priv.hand;
     if(!pool||pool.length===0) pool=HAND_POOL;
@@ -2622,7 +2644,7 @@ function exportLib(level){
   let words=priv[level];
   if(!words||words.length===0) words=WORDS_MAP[level]||[];
   if(words.length===0){alert('该级别无内容可导出');return;}
-  const txt=words.map(w=>w.en+','+w.cn).join(',\n');
+  const txt=words.map(w=>w.en+', '+(w.pos||'')+', '+w.cn+';').join('\n');
   const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -2656,7 +2678,7 @@ function importLib(level){
       if(words.length===0){alert('未能解析到有效单词，请检查格式');return;}
       save.privateLib[level]=words;
       writeSave(save);
-      alert(`成功导入 ${words.length} 个单词到${({easy:'小学级',medium:'初中级',hard:'高中级'})[level]}`);
+      alert(`成功导入 ${words.length} 个单词到${({easy:'小学级',medium:'初中级',hard:'高中级',endless:'无尽'})[level]}`);
     };
     reader.readAsText(file,'utf-8');
   };
@@ -2664,16 +2686,28 @@ function importLib(level){
 }
 function parseImportText(text){
   const words=[];
-  // flatten all text, split only by comma
+  const isEn=en=>/^[a-zA-Z]+(-[a-zA-Z]+)*$/.test(en);
+  const strip=s=>s.replace(/\s+/g,'');
+  if(text.indexOf(';')>=0){
+    // 新版：英文, 词性, 中文;  (支持缺省词性 英文,,中文;)
+    const groups=text.split(/[;\n]/).map(g=>g.trim()).filter(Boolean);
+    for(const g of groups){
+      const parts=g.split(',').map(strip);
+      let en,pos,cn;
+      if(parts.length>=3){ en=parts[0]; pos=parts[1]; cn=parts.slice(2).join(','); }
+      else if(parts.length===2){ en=parts[0]; pos=''; cn=parts[1]; }
+      else continue;
+      if(en&&cn&&isEn(en)) words.push({en:en.toLowerCase(),pos:pos,cn:cn});
+    }
+    return words;
+  }
+  // 原版：英文, 中文（成对，逗号/换行分隔）
   const raw=text.replace(/\r?\n/g,',');
-  const parts=raw.split(',').map(s=>s.trim()).filter(Boolean);
-  // pairs: [en, cn, en, cn, ...]
+  const parts=raw.split(',').map(strip).filter(Boolean);
   for(let i=0;i<parts.length-1;i+=2){
     const en=parts[i];
     const cn=parts[i+1];
-    if(/^[a-zA-Z]+(-[a-zA-Z]+)*$/.test(en)){
-      words.push({en:en.toLowerCase(),cn:cn});
-    }
+    if(isEn(en)) words.push({en:en.toLowerCase(),pos:'',cn:cn});
   }
   return words;
 }
@@ -2705,7 +2739,7 @@ const SOLO_STAGES=[
   {label:'高中 1星',bank:'hard',blanks:[3,3],hand:5,shinyC:0.09,promoScore:40},
   {label:'高中 2星',bank:'hard',blanks:[4,4],hand:5,shinyC:0.11,promoScore:40},
   {label:'高中 3星',bank:'hard',blanks:[5,5],hand:5,shinyC:0.13,promoScore:40},
-  {label:'无尽',bank:'hard',blanks:[5,5],hand:6,shinyC:0.15,promoScore:40},
+  {label:'无尽',bank:'endless',blanks:[5,5],hand:6,shinyC:0.15,promoScore:40},
 ];
 
 const SOLO_BG_COLORS=['#f0f7ff','#e3f0fc','#d6e8f8','#c8dff4','#bbd6f0','#aeceed','#a0c5e9','#92bce5','#84b3e1','#76abde'];
@@ -3066,6 +3100,7 @@ function soloRenderAll(){
   const hasAnyPre=S.slots.some(s=>s.filledBy==='pre');
   document.getElementById('soloCnTop').textContent=!hasAnyPre?S.currentWord.cn:'';
   document.getElementById('soloHint').textContent=hasAnyPre?S.currentWord.cn:'';
+  document.getElementById('soloPos').innerHTML=renderPosTags(S.currentWord.pos);
   if(S.isShiny)ws.classList.add('shiny');else ws.classList.remove('shiny');
   soloRenderStars();
   soloRenderWord();
