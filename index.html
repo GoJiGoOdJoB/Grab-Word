@@ -3006,7 +3006,7 @@ function soloRollShiny(){
   if(window.Dungeon && Dungeon.isActive()) c+=Dungeon.getShinyBonus();
   if(c<=0)return false;
   S.prdCounter++;
-  if(Math.random()<c*S.prdCounter){S.prdCounter=0;if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'SHINY',{});return true;}
+  if(Math.random()<c*S.prdCounter){S.prdCounter=0;if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('SHINY');return true;}
   return false;
 }
 
@@ -3061,7 +3061,7 @@ function soloStartWordTimer(){
   fill.style.width='100%';
   S.wordTimer=setInterval(()=>{
     if(!S.running)return;
-    if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'TICK',{});
+    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('TICK');
     let flowMult = S.wordFlowRate*S.globalFlowRate;
     if(window.Dungeon && Dungeon.isActive()){
       flowMult *= Dungeon.getFlowRateMultiplier();
@@ -3092,7 +3092,7 @@ function soloStartWordTimer(){
         if(S.wordTimerLayer===-1){
           S.combo=0;S.burstCounter=0;S.burstQualities=[];
           soloUpdateCombo();
-          if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'TIMEOUT',{});
+          if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('TIMEOUT');
         }
       }
     }
@@ -3180,7 +3180,7 @@ function soloPlayCard(idx){
     if(window.Dungeon && Dungeon.isActive() && S.wrongCount>=3){
       Dungeon.addStress(Dungeon.brvMitigate('wrongStress', S.wrongCount - 2));
     }
-    if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'WRONG',{});
+    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('WRONG');
     return;
   }
 
@@ -3222,7 +3222,7 @@ function soloPlayCard(idx){
 function soloCheckComplete(){
   if(!S.slots.every(s=>s.filled))return;
   clearInterval(S.wordTimer);
-  if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'COMPLETE',{});
+  if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('COMPLETE');
   S.transitioning=true;
 
   // calculate score for this word
@@ -3527,7 +3527,7 @@ function soloDemote(){
   S.stageIdx=Math.max(minIdx,S.stageIdx-1);
   S.stageScore=0;S.correctCount=0;S.streakCount=0;S.promoReady=false;S.isPromoQuestion=false;
   S.lives--;
-  if(window.DungeonBuff&&window.Dungeon&&Dungeon.isActive())DungeonBuff.dispatchEvent(Dungeon.state,'LIFE',{});
+  if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('LIFE');
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   const flash=document.createElement('div');

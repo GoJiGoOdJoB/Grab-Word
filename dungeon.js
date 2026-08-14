@@ -485,6 +485,7 @@ function dungeonAttrCardHTML(attrKey, currency){
 
 // 道具卡片
 function dungeonItemCardHTML(itemDef, currency){
+  if(!itemDef) return ''; // 池已空（全部已拥有且不可重复）时不渲染
   const cur = currency.toUpperCase();
   const price = dungeonPrice(itemDef.id) || itemDef.price || 0;
   return `
@@ -505,22 +506,33 @@ function dungeonItemCardHTML(itemDef, currency){
     </div>`;
 }
 
-// 道具数据表
-const ITEM_DEFS_LOW = [
-  {id:'shield',   name:'护盾',   nameEn:'Shield',   price:5},
-  {id:'focus',    name:'专注',   nameEn:'Focus',    price:4},
-  {id:'insight',  name:'洞察',   nameEn:'Insight',  price:4},
-  {id:'goldpot',  name:'金币罐', nameEn:'Gold Pot', price:3},
-];
-const ITEM_DEFS_HIGH = [
-  {id:'purify',   name:'净化',   nameEn:'Purify',   price:10},
-  {id:'lucky',    name:'幸运星', nameEn:'Lucky Star',price:9},
-  {id:'slowdown', name:'缓行者', nameEn:'Slowdown', price:12},
-];
-const ITEM_DEFS_TIME = [
-  {id:'rewind',   name:'时间回溯',nameEn:'Rewind',   price:8},
-  {id:'medkit',   name:'急救包',  nameEn:'Med Kit',  price:6},
-];
+// 道具数据表：改为从 item_config 数据驱动（避免与配置表双份数据源）
+// 池成员仍是商城设计选择（哪些 id 出现在哪个池），显示/价格/耐久等全部读配置。
+const SHOP_POOL_IDS = {
+  gLow:  ['shield','focus','insight','goldpot'],
+  gHigh: ['purify','lucky','slowdown'],
+  time:  ['rewind','medkit'],
+};
+function dungeonItemConfig(){
+  return ((typeof DungeonBuff!=='undefined') ? DungeonBuff.catalog() : {}).item_config || {};
+}
+function dungeonItemRepeatable(id){
+  const d = dungeonItemConfig()[id];
+  return !!(d && (d.repeatable===1 || d.repeatable===true));
+}
+// 由 id 列表取道具定义（配置里缺失的自动跳过）
+function dungeonDefsByIds(ids){
+  const ic = dungeonItemConfig();
+  return ids.map(id=>ic[id]).filter(Boolean);
+}
+// 排除「已拥有且不可重复」的道具
+function dungeonPurchasable(defs){
+  return defs.filter(d=> dungeonItemRepeatable(d.id) || !D.buffs.some(b=>b.buffId===d.id));
+}
+// 取某商城池的可购买道具（已洗牌）；池 key 见 SHOP_POOL_IDS
+function dungeonPool(poolKey){
+  return shuffle(dungeonPurchasable(dungeonDefsByIds(SHOP_POOL_IDS[poolKey]||[])));
+}
 
 function dungeonRenderGSection(){
   const section = document.createElement('div');
@@ -530,11 +542,11 @@ function dungeonRenderGSection(){
   const attrPool = shuffle(ATTR_KEYS.slice());
   const cards = [
     dungeonAttrCardHTML(attrPool[0], 'g'),                                       // 1: 固定属性
-    Math.random()<0.7 ? dungeonAttrCardHTML(attrPool[1],'g') : dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'), // 2
-    Math.random()<0.4 ? dungeonAttrCardHTML(attrPool[2],'g') : dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'), // 3
-    dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0], 'g'),                  // 4
-    Math.random()<0.6 ? dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0],'g') : dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'), // 5
-    dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0], 'g'),                 // 6: 固定高价值
+    Math.random()<0.7 ? dungeonAttrCardHTML(attrPool[1],'g') : dungeonItemCardHTML(dungeonPool('gLow')[0],'g'), // 2
+    Math.random()<0.4 ? dungeonAttrCardHTML(attrPool[2],'g') : dungeonItemCardHTML(dungeonPool('gLow')[0],'g'), // 3
+    dungeonItemCardHTML(dungeonPool('gLow')[0], 'g'),                             // 4
+    Math.random()<0.6 ? dungeonItemCardHTML(dungeonPool('gHigh')[0],'g') : dungeonItemCardHTML(dungeonPool('gLow')[0],'g'), // 5
+    dungeonItemCardHTML(dungeonPool('gHigh')[0], 'g'),                            // 6: 固定高价值
   ];
 
   section.innerHTML = `
@@ -559,7 +571,7 @@ function dungeonRenderPSection(){
   section.className = 'dshop-section dshop-section-p';
 
   const attrs = shuffle(ATTR_KEYS.slice()).slice(0,2);
-  const buyTimeItem = {id:'buytime', name:'购买时间', nameEn:'Buy Time +10s'};
+  const buyTimeItem = dungeonDefsByIds(['buytime'])[0];
   const cards = [
     dungeonItemCardHTML(buyTimeItem, 'p'),
     dungeonAttrCardHTML(attrs[0], 'p'),
@@ -587,12 +599,14 @@ function dungeonRenderTSection(){
   const section = document.createElement('div');
   section.className = 'dshop-section dshop-section-t';
 
-  const buyGoldItem = {id:'buygold', name:'购买金币', nameEn:'Buy Gold +3G'};
-  const cards = [
-    dungeonItemCardHTML(buyGoldItem, 't'),
-    dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0], 't'),
-    dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[1]||ITEM_DEFS_TIME[0], 't'),
-  ];
+  const buyGoldItem = dungeonDefsByIds(['buygold'])[0];
+  const timePool = dungeonPool('time');
+  const tAttrs = shuffle(ATTR_KEYS.slice());
+  const cards = [ dungeonItemCardHTML(buyGoldItem, 't') ];
+  for(let i=0;i<2;i++){
+    const def = timePool[i];
+    cards.push(def ? dungeonItemCardHTML(def, 't') : dungeonAttrCardHTML(tAttrs[i], 't'));
+  }
 
   section.innerHTML = `
     <div class="dshop-section-header">
@@ -701,18 +715,19 @@ function dungeonBindRerollBtn(section){
         const attrPool = shuffle(ATTR_KEYS.slice());
         newCards = [
           dungeonAttrCardHTML(attrPool[0],'g'),
-          Math.random()<0.7?dungeonAttrCardHTML(attrPool[1],'g'):dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
-          Math.random()<0.4?dungeonAttrCardHTML(attrPool[2],'g'):dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
-          dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
-          Math.random()<0.6?dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0],'g'):dungeonItemCardHTML(shuffle(ITEM_DEFS_LOW.slice())[0],'g'),
-          dungeonItemCardHTML(shuffle(ITEM_DEFS_HIGH.slice())[0],'g'),
+          Math.random()<0.7?dungeonAttrCardHTML(attrPool[1],'g'):dungeonItemCardHTML(dungeonPool('gLow')[0],'g'),
+          Math.random()<0.4?dungeonAttrCardHTML(attrPool[2],'g'):dungeonItemCardHTML(dungeonPool('gLow')[0],'g'),
+          dungeonItemCardHTML(dungeonPool('gLow')[0],'g'),
+          Math.random()<0.6?dungeonItemCardHTML(dungeonPool('gHigh')[0],'g'):dungeonItemCardHTML(dungeonPool('gLow')[0],'g'),
+          dungeonItemCardHTML(dungeonPool('gHigh')[0],'g'),
         ];
       } else if(currency==='p'){
         const attrs = shuffle(ATTR_KEYS.slice()).slice(0,2);
-        newCards = [dungeonItemCardHTML({id:'buytime',name:'购买时间',nameEn:'Buy Time +10s'},'p'),dungeonAttrCardHTML(attrs[0],'p'),dungeonAttrCardHTML(attrs[1],'p')];
+        newCards = [dungeonItemCardHTML(dungeonDefsByIds(['buytime'])[0],'p'),dungeonAttrCardHTML(attrs[0],'p'),dungeonAttrCardHTML(attrs[1],'p')];
       } else if(currency==='t'){
-        const attrs = shuffle(ATTR_KEYS.slice()).slice(0,1);
-        newCards = [dungeonItemCardHTML({id:'buygold',name:'购买金币',nameEn:'Buy Gold +3'},'t'),dungeonItemCardHTML(shuffle(ITEM_DEFS_TIME.slice())[0],'t'),dungeonAttrCardHTML(attrs[0],'t')];
+        const tAttrs = shuffle(ATTR_KEYS.slice());
+        const tp = dungeonPool('time');
+        newCards = [dungeonItemCardHTML(dungeonDefsByIds(['buygold'])[0],'t'), tp[0]?dungeonItemCardHTML(tp[0],'t'):dungeonAttrCardHTML(tAttrs[0],'t'), tp[1]?dungeonItemCardHTML(tp[1],'t'):dungeonAttrCardHTML(tAttrs[1],'t')];
       }
       grid.innerHTML = newCards.join('');
       dungeonBindCardClicks(section, currency);
@@ -764,6 +779,13 @@ function dungeonBindCardClicks(section, currency){
       const price = parseInt(card.dataset.price);
       const cur   = card.dataset.cur;
       if(!dungeonCanAfford(price, cur)) {
+        dungeonPlayDullSound();
+        return;
+      }
+      // 通用规则：不可重复道具已拥有则拒绝购买（防御，池渲染已排除）
+      const clickItemId = card.dataset.item;
+      if(clickItemId && !card.classList.contains('dcard-attr') &&
+         !dungeonItemRepeatable(clickItemId) && D.buffs.some(b=>b.buffId===clickItemId)){
         dungeonPlayDullSound();
         return;
       }
@@ -1340,6 +1362,30 @@ window.lost_buff = function(v){
   return '已移除 ' + v;
 };
 
+// ===== Buff 系统通用封装（主游戏 / 未来子类统一入口，勿直接摸 DungeonBuff / D）=====
+// 派发游戏事件，返回 payload（支持可拦截 / 可修正型道具写回字段）
+function dungeonDispatch(eventType, payload){
+  if(typeof DungeonBuff==='undefined') return payload || {};
+  return DungeonBuff.dispatchEvent(D, eventType, payload || {});
+}
+// 查询某修正维度的汇总贡献 { additive, multiplier }
+function dungeonQuery(queryKey){
+  if(typeof DungeonBuff==='undefined') return { additive:0, multiplier:1 };
+  return DungeonBuff.query(D, queryKey);
+}
+// 是否拥有某 buff（任一实例）
+function dungeonHasBuff(buffId){
+  return D.buffs.some(function(b){ return b.buffId===buffId; });
+}
+// 某 buff 剩余耐久（多实例取和；无则 0）
+function dungeonBuffRemaining(buffId){
+  var n = 0, has = false;
+  for(var i=0;i<D.buffs.length;i++){
+    if(D.buffs[i].buffId===buffId){ has = true; n += (D.buffs[i].remaining||0); }
+  }
+  return has ? n : 0;
+}
+
 // ===== 暴露全局接口供主文件调用 =====
 window.Dungeon = {
   state: D,
@@ -1361,6 +1407,11 @@ window.Dungeon = {
   getFatigueReduction: dungeonGetFatigueReduction,
   applyRegret: dungeonApplyRegret,
   renderStateArea: dungeonRenderStateArea,
+  // Buff 系统通用封装
+  dispatch: dungeonDispatch,
+  query: dungeonQuery,
+  hasBuff: dungeonHasBuff,
+  buffRemaining: dungeonBuffRemaining,
 };
 
 })();

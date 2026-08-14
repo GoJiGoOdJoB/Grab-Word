@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-07-30T15:32:08
+// 生成时间: 2026-08-14T15:33:19
 // 源文件数: 14
 // ============================================================
 
@@ -147,13 +147,16 @@ window.DungeonBuff = (function () {
     D.buffs.splice(idx, 1);
   }
 
+  // 派发游戏事件。返回 payload：允许「可拦截 / 可修正」型道具在 onEvent 里
+  // 写回字段（如 payload.blocked / payload.mult），主游戏据此决定后续行为。
   function dispatchEvent(D, eventType, payload) {
-    if (!D.buffs) return;
     payload = payload || {};
+    if (!D.buffs) return payload;
     var snapshot = D.buffs.slice();
     for (var i = 0; i < snapshot.length; i++) {
       getBuffHandler(snapshot[i].buffId).onEvent(D, snapshot[i], eventType, payload);
     }
+    return payload;
   }
 
   function query(D, queryKey) {
