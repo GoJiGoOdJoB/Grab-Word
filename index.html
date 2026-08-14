@@ -927,6 +927,8 @@ body.uppercase-mode .card-inner { text-transform: uppercase; }
 .solo-book-section .wordbook-item { }
 .solo-combo-box { position:absolute; top:46px; right:max(20px, calc(50% - 300px)); font-size:36px; font-weight:900; color:#e53935; z-index:50; text-shadow:0 2px 6px rgba(229,57,53,0.3); }
 .solo-combo-box.animating { animation:comboFlash 0.4s ease; }
+.solo-burst-bar { position:absolute; top:88px; right:max(20px, calc(50% - 300px)); width:110px; height:11px; background:rgba(229,57,53,0.15); border-radius:6px; overflow:hidden; z-index:50; display:none; }
+.solo-burst-bar-fill { height:100%; width:0; background:#e53935; border-radius:6px; transition:width 0.25s ease; }
 .solo-pause-btn { padding:5px 10px; background:#fff; border:2px solid #ccc; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap; }
 .solo-promote-flash { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(33,120,210,0.15); z-index:90; display:flex; align-items:center; justify-content:center; animation:promoteFlash 1s ease forwards; pointer-events:none; }
 .solo-promote-flash .promote-text { font-size:clamp(28px,9vw,48px); font-weight:900; color:#2178d2; animation:settleReveal 0.6s ease; text-align:center; max-width:90vw; padding:0 16px; line-height:1.2; box-sizing:border-box; }
@@ -950,6 +952,7 @@ body.uppercase-mode .card-inner { text-transform: uppercase; }
   .combo-p1 { left: 6px; }
   .combo-p2 { right: 6px; }
   .solo-combo-box { font-size: 24px; right: 10px; top: 42px; }
+  .solo-burst-bar { right: 10px; top: 74px; width: 84px; height:9px; }
   #soloStatus { top: 72px; right: 10px; font-size: 16px; }
   .pvp-center { top: 30px; width: 96vw; gap: 4px; }
   .timer-display { font-size: 18px; }
@@ -1326,6 +1329,7 @@ document.addEventListener('mousedown',function(e){if(e.target.tagName!=='INPUT')
       <span class="solo-timer-num" id="soloTimerNum">90</span>
     </div>
   </div>
+  <div class="solo-burst-bar" id="soloBurstBar"><div class="solo-burst-bar-fill" id="soloBurstBarFill"></div></div>
   <div class="solo-combo-box" id="soloCombo"></div>
   <div class="solo-top">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px;">
@@ -3582,8 +3586,14 @@ function soloShowBurst(isPerfect){
 
 function soloUpdateCombo(){
   const el=document.getElementById('soloCombo');
-  el.textContent=S.combo>1?S.combo+'🔥':'';
+  el.textContent=S.combo>1?S.combo:'';
   if(S.combo>1){el.classList.remove('animating');void el.offsetWidth;el.classList.add('animating');}
+  const bar=document.getElementById('soloBurstBar');
+  const fill=document.getElementById('soloBurstBarFill');
+  if(bar&&fill){
+    fill.style.width=Math.min(100,(S.burstCounter/10)*100)+'%';
+    bar.style.display=S.combo>1?'block':'none';
+  }
 }
 
 function soloAddWordBook(quality){
