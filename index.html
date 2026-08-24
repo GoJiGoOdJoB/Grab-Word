@@ -3153,6 +3153,7 @@ function soloRenderHand(){
     c.appendChild(div);
   });
   bindCardTilt(c);
+  if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('HAND_RENDER', { tiles: Array.from(c.children) });
 }
 
 function soloPlayCard(idx){

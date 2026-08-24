@@ -58,6 +58,7 @@ const CURSE_DEFS = {
   fatigue: { name:'乏力', maxLv:0, desc:'段位积分累计降低' }, // 0=无上限
   regret:  { name:'后悔', maxLv:0, desc:'连击中断额外扣分' },
   shackle: { name:'镣铐', maxLv:0, desc:'答题流速增加' },
+  wave:    { name:'海浪', maxLv:4, desc:'手牌波浪状晃动' },
 };
 const CURSE_KEYS = Object.keys(CURSE_DEFS);
 
@@ -332,6 +333,18 @@ function dungeonApplyCurseEffects(){
     // Store dungeon flow penalty for main loop to read
     D._shackleFlowBonus = shackleLv * 0.1;
   }
+  // 任一 buff 变更后立即刷新手牌视觉（诅咒/道具局内添加即刻生效，不等下次词牌更新）
+  dungeonRefreshHand();
+}
+
+// 局内立即重渲染手牌：重建 DOM 会重新派发 HAND_RENDER，使视觉类 buff（如疲惫）当即生效，
+// 同时清掉已移除 buff 残留的样式类。仅在对局进行中执行。
+function dungeonRefreshHand(){
+  if(!D.active) return;
+  if(typeof S==='undefined' || !S || !S.running) return;
+  if(typeof soloRenderHand!=='function') return;
+  if(!document.getElementById('soloHand')) return;
+  soloRenderHand();
 }
 
 // 乏力: 段位积分累计降低
@@ -1022,7 +1035,16 @@ function dungeonApplyCardTilt(container){
 const style = document.createElement('style');
 style.textContent = `
 @keyframes dungeonCurseFlash {
-  0%{opacity:1} 100%{opacity:0}
+  0%{opacity:1} 100%{opacity:0}}
+
+/* ===== 诅咒·海浪：手牌波浪晃动（偏上浮动，上9下1） ===== */
+@keyframes dungeonWaveFloat {
+  0%,100% { transform: translateY(calc(var(--wave-amp,6px) / 9)); }
+  50%     { transform: translateY(calc(var(--wave-amp,6px) * -1)); }
+}
+.dungeon-wave-tile {
+  animation: dungeonWaveFloat 1.1s ease-in-out infinite;
+  will-change: transform;
 }
 
 /* ===== 地牢商城样式 ===== */

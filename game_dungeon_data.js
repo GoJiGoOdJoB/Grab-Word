@@ -2,8 +2,8 @@
 // 源文件: GW配置表.xlsx
 // 用法: <script src="game_dungeon_data.js"></script> 后读 window.DUNGEON_DATA
 window.DUNGEON_DATA = {
-  "version": "20260805.231721",
-  "generatedAt": "2026-08-05T23:17:21",
+  "version": "20260824.203426",
+  "generatedAt": "2026-08-24T20:34:26",
   "source": "GW配置表.xlsx",
   "tables": {
     "attr_config": {
@@ -315,6 +315,15 @@ window.DUNGEON_DATA = {
         "maxLv": 0,
         "appliesOn": "FLOW",
         "perLevel": "每级流速乘数+10%"
+      },
+      "wave": {
+        "id": "wave",
+        "name": "海浪",
+        "nameEn": "Wave",
+        "desc": "手牌整体呈波浪状上下晃动，干扰视觉",
+        "maxLv": 4,
+        "appliesOn": "HAND_RENDER",
+        "perLevel": "每级向上位移12/26/54/110px"
       }
     },
     "shop_coeff": {
