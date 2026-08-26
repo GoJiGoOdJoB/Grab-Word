@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-08-24T20:34:26
+// 生成时间: 2026-08-24T20:54:04
 // 源文件数: 15
 // ============================================================
 
@@ -253,7 +253,9 @@ DungeonBuff.register('shackle', class extends DungeonBuff.CurseBuff {
 // ---- buffs/curse/wave.js ----
 // buffs/curse/wave.js
 // 海浪：手牌整体呈波浪状上下晃动（偏上浮动），最高 4 层，层数越高晃动幅度越大。
-// 由主游戏在 soloRenderHand 末尾派发 'HAND_RENDER' 事件驱动，payload.tiles 为手牌 DOM 列表。
+// 由主游戏在 soloRenderHand 末尾派发 'HAND_RENDER' 事件驱动，payload.tiles 为手牌 .card DOM 列表。
+// 位移写入卡牌的位移合成层 .card-motion（变量 --wave-amp 驱动动画 --wave-y），
+// 与其它位移 buff 叠加、互不覆盖；出牌飞行读取合成层，无需感知本诅咒。
 DungeonBuff.register('wave', class extends DungeonBuff.CurseBuff {
   onEvent(D, instance, eventType, payload) {
     if (eventType !== 'HAND_RENDER' || !payload || !payload.tiles) return;
@@ -262,9 +264,11 @@ DungeonBuff.register('wave', class extends DungeonBuff.CurseBuff {
     for (var i = 0; i < tiles.length; i++) {
       var t = tiles[i];
       if (!t || t.classList.contains('used')) continue; // 空槽不晃
-      t.classList.add('dungeon-wave-tile');
-      t.style.setProperty('--wave-amp', amp + 'px');
-      t.style.animationDelay = (i * 0.13) + 's'; // 相邻牌错相位 → 波浪
+      var motion = t.querySelector && t.querySelector('.card-motion');
+      if (!motion) continue;
+      motion.classList.add('dungeon-wave-tile');
+      motion.style.setProperty('--wave-amp', amp + 'px');
+      motion.style.animationDelay = (i * 0.13) + 's'; // 相邻牌错相位 → 波浪
     }
   }
 });

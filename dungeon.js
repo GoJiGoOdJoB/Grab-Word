@@ -1037,14 +1037,20 @@ style.textContent = `
 @keyframes dungeonCurseFlash {
   0%{opacity:1} 100%{opacity:0}}
 
-/* ===== 诅咒·海浪：手牌波浪晃动（偏上浮动，上9下1） ===== */
-@keyframes dungeonWaveFloat {
-  0%,100% { transform: translateY(calc(var(--wave-amp,6px) / 9)); }
-  50%     { transform: translateY(calc(var(--wave-amp,6px) * -1)); }
+/* ===== 诅咒·海浪：手牌波浪晃动（偏上浮动，上9下1） =====
+   写入位移合成层 .card-motion 的 --wave-y 变量（不直接写 transform），
+   与其它位移 buff 天然叠加、互不覆盖。@property 保证 <length> 平滑插值。 */
+@property --wave-y {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
 }
-.dungeon-wave-tile {
+@keyframes dungeonWaveFloat {
+  0%,100% { --wave-y: calc(var(--wave-amp,6px) / 9); }
+  50%     { --wave-y: calc(var(--wave-amp,6px) * -1); }
+}
+.card-motion.dungeon-wave-tile {
   animation: dungeonWaveFloat 1.1s ease-in-out infinite;
-  will-change: transform;
 }
 
 /* ===== 地牢商城样式 ===== */

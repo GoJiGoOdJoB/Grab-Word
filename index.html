@@ -290,6 +290,19 @@ body {
   position: relative;
   transition: opacity 0.25s, transform 0.25s;
 }
+/* 卡牌位移合成层：所有"位移类 buff"叠加到这里（各写各的变量，天然相加、互不覆盖）。
+   新增位移 buff：①@property 声明 --xxx-x/y ②在下面 calc 各加一项 ③buff 动画只改自己的变量。
+   出牌飞行读取本层的合成 transform（单一来源），无需改动飞行逻辑。 */
+.card-motion {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform: translate(
+    calc(var(--wave-x, 0px)),
+    calc(var(--wave-y, 0px))
+  );
+  will-change: transform;
+}
 /* 上层卡面（3D 倾斜目标） */
 .card-inner {
   position: absolute;
@@ -342,6 +355,9 @@ body {
 .card.used::before { opacity: 0; }
 .card.discarding { opacity: 0; transform: scale(0.5) translateY(20px); transition: all 0.3s; }
 .card.flying-out { animation: cardFlyOut 0.25s ease forwards; pointer-events: none; }
+/* 单人：正确卡从当前位置飞向词牌中心偏下，关闭阴影、渐隐（movement 由 JS/WAAPI 驱动） */
+.card.fly-to-word { pointer-events: none; z-index: 30; }
+.card.fly-to-word::before { opacity: 0; transition: opacity 0.08s; }
 .card.drawing { animation: cardDraw 0.3s ease forwards; }
 .hand-cards.penalty .card { opacity: 0.3; pointer-events: none; filter: grayscale(1); transition: all 0.15s; }
 .hand-cards.passed .card { opacity: 0.25; pointer-events: none; filter: grayscale(1); transition: all 0.2s; }
@@ -1873,7 +1889,7 @@ function renderHands(){
   G.p1Hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`<div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys1[i]||''}</span></div>`;
+    div.innerHTML=`<div class="card-motion"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys1[i]||''}</span></div></div>`;
     div.onclick=()=>playCard('p1',i);
     c1.appendChild(div);
   });
@@ -1881,7 +1897,7 @@ function renderHands(){
   G.p2Hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`<div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys2[i]||''}</span></div>`;
+    div.innerHTML=`<div class="card-motion"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys2[i]||''}</span></div></div>`;
     div.onclick=()=>playCard('p2',i);
     c2.appendChild(div);
   });
@@ -3148,7 +3164,7 @@ function soloRenderHand(){
   S.hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`<div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${keys[i]||''}</span></div>`;
+    div.innerHTML=`<div class="card-motion"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${keys[i]||''}</span></div></div>`;
     div.onclick=()=>soloPlayCard(i);
     c.appendChild(div);
   });
@@ -3192,7 +3208,28 @@ function soloPlayCard(idx){
   // animate fly out + draw
   const containerBefore=document.getElementById('soloHand');
   const flyCard=containerBefore.children[idx];
-  if(flyCard)flyCard.classList.add('flying-out');
+  if(flyCard){
+    const wordEl=document.getElementById('soloWord');
+    const motion=flyCard.querySelector('.card-motion');   // 位移合成层（wave 等 buff 都写这层）
+    if(wordEl && motion && typeof motion.animate==='function'){
+      const cr=motion.getBoundingClientRect();             // 卡面此刻真实位置（含所有位移 buff）
+      const wr=wordEl.getBoundingClientRect();
+      // 读取合成层当前 transform（单一来源，不关心是哪个 buff），飞行从"此刻位置"起步、不回弹
+      let curX=0,curY=0;
+      const cs=getComputedStyle(motion).transform;
+      if(cs && cs!=='none'){ try{ const m=new DOMMatrixReadOnly(cs); curX=m.m41; curY=m.m42; }catch(e){} }
+      const dx=(wr.left+wr.width/2)-(cr.left+cr.width/2);          // → 词牌中心 X
+      const dy=(wr.top+wr.height*0.6)-(cr.top+cr.height/2);        // → 词牌中心偏下 Y
+      flyCard.classList.add('fly-to-word');                        // 关闭阴影 + 禁交互
+      // WAAPI 直接接管合成层 transform，覆盖 buff 的变量式位移，无需逐个冻结
+      motion.animate([
+        { transform:`translate(${curX}px, ${curY}px)`, opacity:1 },
+        { transform:`translate(${curX+dx}px, ${curY+dy}px)`, opacity:0 }
+      ], { duration:250, easing:'cubic-bezier(.35,.15,.25,1)', fill:'forwards' });
+    } else {
+      flyCard.classList.add('flying-out');
+    }
+  }
   setTimeout(()=>{
     S.hand[idx]=null;
     const alpha=getEffectiveHand();
