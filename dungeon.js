@@ -333,11 +333,20 @@ function dungeonApplyCurseEffects(){
     // Store dungeon flow penalty for main loop to read
     D._shackleFlowBonus = shackleLv * 0.1;
   }
-  // 任一 buff 变更后立即刷新手牌视觉（诅咒/道具局内添加即刻生效，不等下次词牌更新）
+  // 任一 buff 变更后立即刷新词牌和手牌，使视觉类诅咒局内添加即刻生效。
+  dungeonRefreshWord();
   dungeonRefreshHand();
 }
 
-// 局内立即重渲染手牌：重建 DOM 会重新派发 HAND_RENDER，使视觉类 buff（如疲惫）当即生效，
+function dungeonRefreshWord(){
+  if(!D.active) return;
+  if(typeof S==='undefined' || !S || !S.running) return;
+  if(typeof soloRenderWord!=='function') return;
+  if(!document.getElementById('soloWord')) return;
+  soloRenderWord();
+}
+
+// 局内立即重渲染手牌：重建 DOM 会重新派发 HAND_RENDER，使视觉类 buff（如海浪）当即生效，
 // 同时清掉已移除 buff 残留的样式类。仅在对局进行中执行。
 function dungeonRefreshHand(){
   if(!D.active) return;

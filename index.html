@@ -230,12 +230,13 @@ body {
   border-color: #2178d2;
   animation: slotBlink 0.8s ease infinite;
 }
-@keyframes slotBlink {
-  0%,100% { border-color: #2178d2; }
-  50% { border-color: transparent; }
-}
-.letter-slot.bling { animation: bling 0.35s ease; }
-.word-status { font-size: 13px; height: 16px; color: #e53935; font-weight: bold; }
+	@keyframes slotBlink {
+	  0%,100% { border-color: #2178d2; }
+	  50% { border-color: transparent; }
+	}
+	.letter-slot.bling { animation: bling 0.35s ease; }
+	.letter-slot.dungeon-trance-fading { opacity: 0; transition: opacity 0.22s ease; }
+	.word-status { font-size: 13px; height: 16px; color: #e53935; font-weight: bold; }
 #soloStatus { position:absolute; top:84px; right:20px; font-size:18px; height:auto; min-height:20px; line-height:1.5; text-align:right; z-index:50; color:#f5a623; font-weight:bold; max-width:45vw; }
 
 .word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; max-width:123px; margin:0 auto; }
@@ -3152,8 +3153,9 @@ function soloRenderWord(){
       div.classList.add('blank-slot');
       if(i===nextBlank)div.classList.add('next-slot');
     }
-    container.appendChild(div);
-  });
+	  container.appendChild(div);
+	});
+	if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('RENDER', { tiles: Array.from(container.children) });
 }
 
 function soloRenderHand(){

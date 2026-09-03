@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-08-24T20:54:04
+// 生成时间: 2026-09-03T20:08:15
 // 源文件数: 15
 // ============================================================
 
@@ -190,11 +190,80 @@ window.DungeonBuff = (function () {
 
 // ---- buffs/curse/daze.js ----
 // buffs/curse/daze.js
-// TODO(daze)：字母随机闪烁透明度
+// 恍惚：词牌刷新后立刻渐隐；后续按随机间隔重复，连续两轮优先不选相同字母。
 DungeonBuff.register('daze', class extends DungeonBuff.CurseBuff {
+  onAdd(D, instance) {
+    instance._daze = { timers: [], active: [], previous: [] };
+  }
+
+  onRemove(D, instance) {
+    this._clear(instance);
+  }
+
   onEvent(D, instance, eventType, payload) {
-    if (eventType !== 'RENDER') return;
-    // TODO: 字母随机闪烁透明度
+    if (eventType !== 'RENDER' || !payload || !payload.tiles) return;
+    this._clear(instance);
+    var state = instance._daze = { timers: [], active: [], previous: [], tiles: payload.tiles };
+    var count = Math.min(instance.level, 3);
+    var duration = instance.level >= 4 ? 2000 : 1000;
+    this._schedule(instance, count, duration, true);
+  }
+
+  _schedule(instance, count, duration, immediate) {
+    var self = this;
+    var state = instance._daze;
+    if (!state) return;
+    var run = function () {
+      if (!instance._daze || instance._daze !== state) return;
+      self._fade(instance, count, duration);
+      state.timers.push(setTimeout(run, duration + self._delay()));
+    };
+    if (immediate) run();
+    else state.timers.push(setTimeout(run, this._delay()));
+  }
+
+  _fade(instance, count, duration) {
+    var state = instance._daze;
+    if (!state || !state.tiles) return;
+    var choices = state.tiles.filter(function (tile) {
+      return tile && tile.isConnected && state.active.indexOf(tile) === -1 && state.previous.indexOf(tile) === -1;
+    });
+    if (choices.length < count) {
+      choices = state.tiles.filter(function (tile) {
+        return tile && tile.isConnected && state.active.indexOf(tile) === -1;
+      });
+    }
+    if (!choices.length) return;
+    var selected = [];
+    while (choices.length && selected.length < count) {
+      var index = Math.floor(Math.random() * choices.length);
+      selected.push(choices.splice(index, 1)[0]);
+    }
+    state.previous = selected;
+    for (var i = 0; i < selected.length; i++) {
+      var tile = selected[i];
+      state.active.push(tile);
+      tile.classList.add('dungeon-trance-fading');
+      state.timers.push(setTimeout(function (target) {
+        return function () {
+          target.classList.remove('dungeon-trance-fading');
+          var activeIndex = state.active.indexOf(target);
+          if (activeIndex !== -1) state.active.splice(activeIndex, 1);
+        };
+      }(tile), duration));
+    }
+  }
+
+  _delay() {
+    return 1200 + Math.floor(Math.random() * 1201);
+  }
+
+  _clear(instance) {
+    var state = instance._daze;
+    if (!state) return;
+    for (var i = 0; i < state.timers.length; i++) clearTimeout(state.timers[i]);
+    for (var j = 0; j < state.active.length; j++) state.active[j].classList.remove('dungeon-trance-fading');
+    instance._daze = null;
   }
 });
 

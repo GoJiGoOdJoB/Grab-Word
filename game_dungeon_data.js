@@ -2,8 +2,8 @@
 // 源文件: GW配置表.xlsx
 // 用法: <script src="game_dungeon_data.js"></script> 后读 window.DUNGEON_DATA
 window.DUNGEON_DATA = {
-  "version": "20260824.203426",
-  "generatedAt": "2026-08-24T20:34:26",
+  "version": "20260903.171333",
+  "generatedAt": "2026-09-03T17:13:33",
   "source": "GW配置表.xlsx",
   "tables": {
     "attr_config": {
@@ -265,11 +265,11 @@ window.DUNGEON_DATA = {
       "daze": {
         "id": "daze",
         "name": "恍惚",
-        "nameEn": "Daze",
-        "desc": "字母透明度闪烁，制造视觉干扰",
-        "maxLv": 5,
+        "nameEn": "Trance",
+        "desc": "词牌字母随机渐隐，制造视觉干扰",
+        "maxLv": 4,
         "appliesOn": "RENDER",
-        "perLevel": "每级字母闪烁频率+20%"
+        "perLevel": "Lv1/2/3同时随机渐隐1/2/3个不同字母1秒；Lv4渐隐2秒"
       },
       "illusion": {
         "id": "illusion",
