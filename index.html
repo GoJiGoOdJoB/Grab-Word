@@ -291,9 +291,16 @@ body {
   position: relative;
   transition: opacity 0.25s, transform 0.25s;
 }
-/* 卡牌位移合成层：所有"位移类 buff"叠加到这里（各写各的变量，天然相加、互不覆盖）。
-   新增位移 buff：①@property 声明 --xxx-x/y ②在下面 calc 各加一项 ③buff 动画只改自己的变量。
-   出牌飞行读取本层的合成 transform（单一来源），无需改动飞行逻辑。 */
+/* 阴影与卡面独立渲染：同位置一一对应。阴影只接受旋转，不接受位移 buff。 */
+.card-shadow-spin {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transform: rotate(var(--cyclone-rotation, 0deg));
+  transform-origin: center center;
+  will-change: transform;
+}
+/* 卡面位移层：按手牌组坐标系移动，不受内部旋转影响。 */
 .card-motion {
   position: absolute;
   inset: 0;
@@ -302,6 +309,14 @@ body {
     calc(var(--wave-x, 0px)),
     calc(var(--wave-y, 0px))
   );
+  will-change: transform;
+}
+/* 卡面旋转层：位于位移层内，旋转不会改变海浪的上下位移方向。 */
+.card-spin {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--cyclone-rotation, 0deg));
+  transform-origin: center center;
   will-change: transform;
 }
 /* 上层卡面（3D 倾斜目标） */
@@ -322,22 +337,24 @@ body {
   will-change: transform;
   backface-visibility: hidden;
 }
-/* 下层静止阴影板（数量随卡片天然同步） */
-.card::before {
+/* 下层阴影板：固定在卡槽原位，核心层按对应卡面的实际位移计算缩放和透明度。 */
+.card-shadow-spin::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 5px;
-  transform: translateY(4px);
-  transition: transform 0.12s;
-  z-index: 0;
+  --shadow-lift: 4px;
+  opacity: var(--card-shadow-opacity, 0.8);
+  transform: translateY(var(--shadow-lift)) scale(var(--card-shadow-scale, 1));
+  transform-origin: center center;
+  transition: transform 0.12s, opacity 0.12s;
 }
 .split.left  .card-inner  { border: 2px solid #0d3172; color: #2178d2; }
-.split.left  .card::before { background: #0d3172; }
+.split.left  .card-shadow-spin::before { background: #0d3172; }
 .split.right .card-inner  { border: 2px solid #7a4f00; color: #b8960a; }
-.split.right .card::before { background: #7a4f00; }
+.split.right .card-shadow-spin::before { background: #7a4f00; }
 .solo-cards-section .card-inner  { border: 2px solid #0d3172; color: #2178d2; }
-.solo-cards-section .card::before { background: #0d3172; }
+.solo-cards-section .card-shadow-spin::before { background: #0d3172; }
 .card .key-hint {
   position: absolute;
   top: 100%;
@@ -348,17 +365,17 @@ body {
   color: inherit;
 }
 /* 悬浮/点击的卡面位移由 JS 倾斜接管；阴影板随状态加深/压平 */
-.card:hover::before  { transform: translateY(6px); }
-.card:active::before { transform: translateY(1px); }
+.card:hover .card-shadow-spin::before  { --shadow-lift: 6px; }
+.card:active .card-shadow-spin::before { --shadow-lift: 1px; }
 .card.cooldown { opacity: 0.35; }
 .card.shake-card .card-inner { animation: cardShake 0.3s; border-color: #f44336 !important; color: #f44336 !important; }
 .card.used { opacity: 0; pointer-events: none; transform: scale(0.6) translateY(-10px); }
-.card.used::before { opacity: 0; }
+.card.used .card-shadow-spin::before { opacity: 0; }
 .card.discarding { opacity: 0; transform: scale(0.5) translateY(20px); transition: all 0.3s; }
 .card.flying-out { animation: cardFlyOut 0.25s ease forwards; pointer-events: none; }
 /* 单人：正确卡从当前位置飞向词牌中心偏下，关闭阴影、渐隐（movement 由 JS/WAAPI 驱动） */
 .card.fly-to-word { pointer-events: none; z-index: 30; }
-.card.fly-to-word::before { opacity: 0; transition: opacity 0.08s; }
+.card.fly-to-word .card-shadow-spin::before { opacity: 0; transition: opacity 0.08s; }
 .card.drawing { animation: cardDraw 0.3s ease forwards; }
 .hand-cards.penalty .card { opacity: 0.3; pointer-events: none; filter: grayscale(1); transition: all 0.15s; }
 .hand-cards.passed .card { opacity: 0.25; pointer-events: none; filter: grayscale(1); transition: all 0.2s; }
@@ -1842,6 +1859,27 @@ function renderWord(container){
   });
 }
 
+// ===== 手牌卡面与阴影绑定：阴影固定卡槽，跟随卡面旋转，并按实际距离缩放/透明 =====
+function bindCardShadow(card){
+  const face=card.querySelector('.card-motion');
+  const shadow=card.querySelector('.card-shadow-spin');
+  if(!face||!shadow)return;
+  let frame=0;
+  const update=()=>{
+    const fr=face.getBoundingClientRect(), sr=shadow.getBoundingClientRect();
+    const dx=(fr.left+fr.width/2)-(sr.left+sr.width/2);
+    const dy=(fr.top+fr.height/2)-(sr.top+sr.height/2);
+    const distance=Math.hypot(dx,dy);
+    const ratio=Math.min(1,distance/(Math.max(fr.width,fr.height)*1.5));
+    shadow.style.setProperty('--card-shadow-scale',(1-ratio*0.5).toFixed(3));
+    shadow.style.setProperty('--card-shadow-opacity',(0.9-ratio*0.4).toFixed(3));
+    frame=requestAnimationFrame(update);
+  };
+  cancelAnimationFrame(card._shadowFrame);
+  update();
+  card._shadowFrame=frame;
+}
+
 // ===== 手牌小丑牌式 3D 悬浮倾斜（事件委托，卡面 .card-inner 变换，阴影板 ::before 静止） =====
 function bindCardTilt(container){
   if(!container||container._cardTiltBound)return;
@@ -1890,7 +1928,7 @@ function renderHands(){
   G.p1Hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`<div class="card-motion"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys1[i]||''}</span></div></div>`;
+    div.innerHTML=`<div class="card-shadow-spin"></div><div class="card-motion"><div class="card-spin"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys1[i]||''}</span></div></div></div>`;
     div.onclick=()=>playCard('p1',i);
     c1.appendChild(div);
   });
@@ -1898,11 +1936,13 @@ function renderHands(){
   G.p2Hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`<div class="card-motion"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys2[i]||''}</span></div></div>`;
+    div.innerHTML=`<div class="card-shadow-spin"></div><div class="card-motion"><div class="card-spin"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${cfg.keys2[i]||''}</span></div></div></div>`;
     div.onclick=()=>playCard('p2',i);
     c2.appendChild(div);
   });
   bindCardTilt(c1); bindCardTilt(c2);
+  c1.querySelectorAll('.card').forEach(bindCardShadow);
+  c2.querySelectorAll('.card').forEach(bindCardShadow);
 }
 
 function renderWordStars(container, baseCount, isShiny){
@@ -3155,7 +3195,7 @@ function soloRenderWord(){
     }
 	  container.appendChild(div);
 	});
-	if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('RENDER', { tiles: Array.from(container.children) });
+	if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('RENDER', { tiles: Array.from(container.children), handSize: S.hand.length });
 }
 
 function soloRenderHand(){
@@ -3166,12 +3206,13 @@ function soloRenderHand(){
   S.hand.forEach((l,i)=>{
     const div=document.createElement('div');
     div.className='card'+(l===null?' used':'');
-    div.innerHTML=`<div class="card-motion"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${keys[i]||''}</span></div></div>`;
+    div.innerHTML=`<div class="card-shadow-spin"></div><div class="card-motion"><div class="card-spin"><div class="card-inner">${(l||'').toUpperCase()}<span class="key-hint">${keys[i]||''}</span></div></div></div>`;
     div.onclick=()=>soloPlayCard(i);
     c.appendChild(div);
   });
   bindCardTilt(c);
-  if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('HAND_RENDER', { tiles: Array.from(c.children) });
+  c.querySelectorAll('.card').forEach(bindCardShadow);
+  if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('HAND_RENDER', { tiles: Array.from(c.children), slots: Array.from(c.children).map((tile, index) => ({ index:index + 1, tile:tile })) });
 }
 
 function soloPlayCard(idx){

@@ -59,6 +59,7 @@ const CURSE_DEFS = {
   regret:  { name:'后悔', maxLv:0, desc:'连击中断额外扣分' },
   shackle: { name:'镣铐', maxLv:0, desc:'答题流速增加' },
   wave:    { name:'海浪', maxLv:4, desc:'手牌波浪状晃动' },
+  cyclone: { name:'旋风', maxLv:3, desc:'随机位置手牌旋转' },
 };
 const CURSE_KEYS = Object.keys(CURSE_DEFS);
 
@@ -1054,12 +1055,23 @@ style.textContent = `
   inherits: false;
   initial-value: 0px;
 }
+@property --cyclone-rotation {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
 @keyframes dungeonWaveFloat {
   0%,100% { --wave-y: calc(var(--wave-amp,6px) / 9); }
   50%     { --wave-y: calc(var(--wave-amp,6px) * -1); }
 }
+@keyframes dungeonCycloneSpin {
+  to { --cyclone-rotation: calc(360deg * var(--cyclone-direction, 1)); }
+}
 .card-motion.dungeon-wave-tile {
   animation: dungeonWaveFloat 1.1s ease-in-out infinite;
+}
+.card.dungeon-cyclone-tile {
+  animation: dungeonCycloneSpin 1.4s linear infinite;
 }
 
 /* ===== 地牢商城样式 ===== */

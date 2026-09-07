@@ -1,7 +1,7 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-09-03T20:08:15
-// 源文件数: 15
+// 生成时间: 2026-09-07T20:16:07
+// 源文件数: 16
 // ============================================================
 
 // ---- buffs/_base.js ----
@@ -187,6 +187,39 @@ window.DungeonBuff = (function () {
     getAttrEffect: getAttrEffect,
   };
 })();
+
+// ---- buffs/curse/cyclone.js ----
+// buffs/curse/cyclone.js
+// 旋风：词牌切换时随机锁定 1/2/3 个手牌位置；该位置每次补牌都会重新应用旋转。
+DungeonBuff.register('cyclone', class extends DungeonBuff.CurseBuff {
+  onEvent(D, instance, eventType, payload) {
+    if (eventType === 'RENDER') {
+      instance._cycloneSlots = this._pickSlots(instance.level, payload && payload.handSize);
+      instance._cycloneDirection = Math.random() < 0.5 ? -1 : 1;
+      return;
+    }
+    if (eventType !== 'HAND_RENDER' || !payload || !payload.slots) return;
+    var selected = instance._cycloneSlots || [];
+    for (var i = 0; i < payload.slots.length; i++) {
+      var slot = payload.slots[i];
+      if (!slot || selected.indexOf(slot.index) === -1 || slot.tile.classList.contains('used')) continue;
+      slot.tile.classList.add('dungeon-cyclone-tile');
+      slot.tile.style.setProperty('--cyclone-direction', instance._cycloneDirection || 1);
+    }
+  }
+
+  _pickSlots(level, handSize) {
+    var slots = [];
+    for (var i = 1; i <= (handSize || 6); i++) slots.push(i);
+    for (var j = slots.length - 1; j > 0; j--) {
+      var pick = Math.floor(Math.random() * (j + 1));
+      var temp = slots[j];
+      slots[j] = slots[pick];
+      slots[pick] = temp;
+    }
+    return slots.slice(0, Math.min(level, 3, slots.length));
+  }
+});
 
 // ---- buffs/curse/daze.js ----
 // buffs/curse/daze.js

@@ -2,8 +2,8 @@
 // 源文件: GW配置表.xlsx
 // 用法: <script src="game_dungeon_data.js"></script> 后读 window.DUNGEON_DATA
 window.DUNGEON_DATA = {
-  "version": "20260903.171333",
-  "generatedAt": "2026-09-03T17:13:33",
+  "version": "20260907.173459",
+  "generatedAt": "2026-09-07T17:34:59",
   "source": "GW配置表.xlsx",
   "tables": {
     "attr_config": {
@@ -324,6 +324,15 @@ window.DUNGEON_DATA = {
         "maxLv": 4,
         "appliesOn": "HAND_RENDER",
         "perLevel": "每级向上位移12/26/54/110px"
+      },
+      "cyclone": {
+        "id": "cyclone",
+        "name": "旋风",
+        "nameEn": "Cyclone",
+        "desc": "随机锁定手牌位置，位置内卡牌持续旋转",
+        "maxLv": 3,
+        "appliesOn": "RENDER / HAND_RENDER",
+        "perLevel": "每级随机锁定1个位置；位置内当前及后续补入手牌顺时针旋转"
       }
     },
     "shop_coeff": {
