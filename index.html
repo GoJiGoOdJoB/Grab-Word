@@ -3059,6 +3059,12 @@ function soloApplyWrongPenalty(){
 }
 
 function soloRollShiny(){
+  if(S.nextShiny){
+    S.nextShiny=false;
+    S.prdCounter=0;
+    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('SHINY');
+    return true;
+  }
   let c=soloStage().shinyC;
   if(window.Dungeon && Dungeon.isActive()) c+=Dungeon.getShinyBonus();
   if(c<=0)return false;
@@ -3879,6 +3885,7 @@ window.tower_max=function(){if(selectedMode!=='solo')return 'Not in solo mode';S
 window.tower_up=function(){if(selectedMode!=='solo')return 'Not in solo mode';if(S.stageIdx>=9){S.endlessLevel++;}else{S.stageIdx++;}S.maxStageReached=Math.max(S.maxStageReached,S.stageIdx);S.stageScore=0;S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);soloUpdateStageUI();soloSetupWord();return S.stageIdx>=9?'无尽 '+S.endlessLevel:'Stage '+S.stageIdx;};
 window.set_point=function(n){if(selectedMode!=='solo')return 'Not in solo mode';S.totalScore=n;soloUpdateStageUI();return 'Score set to '+n;};
 window.game_over=function(){if(selectedMode!=='solo')return 'Not in solo mode';soloEndGame();return 'Game ended';};
+window.card_next_rare=function(){if(selectedMode!=='solo'||!S.running)return 'Not in solo game';S.nextShiny=true;return 'Next word will be shiny';};
 window.shop=function(stageIdx){
   if(!window.Dungeon) return 'Dungeon module not loaded';
   if(selectedMode!=='solo') return 'Not in solo mode';

@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-09-07T20:16:07
+// 生成时间: 2026-09-09T17:46:30
 // 源文件数: 16
 // ============================================================
 
@@ -66,10 +66,12 @@ window.DungeonBuff = (function () {
     onEvent(D, instance, eventType, payload) {
       var def = this.def;
       if (!def || eventType !== def.triggerOn) return;
-      if (instance.remaining <= 0) return;
+      if (instance.remaining === 0) return;
       this._applyEffect(D, instance, payload);
-      instance.remaining--;
-      if (instance.remaining <= 0) removeBuff(D, instance.instanceId);
+      if (instance.remaining > 0) {
+        instance.remaining--;
+        if (instance.remaining === 0) removeBuff(D, instance.instanceId);
+      }
     }
     _applyEffect(D, instance, payload) {} // 子类覆盖
   }

@@ -2,8 +2,8 @@
 // 源文件: GW配置表.xlsx
 // 用法: <script src="game_dungeon_data.js"></script> 后读 window.DUNGEON_DATA
 window.DUNGEON_DATA = {
-  "version": "20260907.173459",
-  "generatedAt": "2026-09-07T17:34:59",
+  "version": "20260909.174630",
+  "generatedAt": "2026-09-09T17:46:30",
   "source": "GW配置表.xlsx",
   "tables": {
     "attr_config": {
@@ -163,7 +163,7 @@ window.DUNGEON_DATA = {
         "desc": "每个流速tick降低答题流速",
         "category": "PASSIVE",
         "triggerOn": "TICK",
-        "remaining": 999,
+        "remaining": -1,
         "shopZone": "G",
         "basePrice": 12,
         "priceStep": 1,
@@ -269,7 +269,8 @@ window.DUNGEON_DATA = {
         "desc": "词牌字母随机渐隐，制造视觉干扰",
         "maxLv": 4,
         "appliesOn": "RENDER",
-        "perLevel": "Lv1/2/3同时随机渐隐1/2/3个不同字母1秒；Lv4渐隐2秒"
+        "perLevel": "Lv1/2/3同时随机渐隐1/2/3个不同字母1秒；Lv4渐隐2秒",
+        "type": "视觉"
       },
       "illusion": {
         "id": "illusion",
@@ -278,7 +279,8 @@ window.DUNGEON_DATA = {
         "desc": "手牌字母互换位置",
         "maxLv": 3,
         "appliesOn": "DEAL",
-        "perLevel": "每级互换字母数+1"
+        "perLevel": "每级互换字母数+1",
+        "type": "视觉"
       },
       "imbalance": {
         "id": "imbalance",
@@ -287,7 +289,8 @@ window.DUNGEON_DATA = {
         "desc": "字母倒转显示",
         "maxLv": 5,
         "appliesOn": "RENDER",
-        "perLevel": "每级倒转字母数+1"
+        "perLevel": "每级倒转字母数+1",
+        "type": "视觉"
       },
       "fatigue": {
         "id": "fatigue",
@@ -296,7 +299,8 @@ window.DUNGEON_DATA = {
         "desc": "段位积分累计降低",
         "maxLv": 0,
         "appliesOn": "SCORE",
-        "perLevel": "每级积分降低比例+10%（上限80%）"
+        "perLevel": "每级积分降低比例+10%（上限80%）",
+        "type": "数值"
       },
       "regret": {
         "id": "regret",
@@ -305,7 +309,8 @@ window.DUNGEON_DATA = {
         "desc": "连击中断时额外扣分/扣时间",
         "maxLv": 0,
         "appliesOn": "BREAK",
-        "perLevel": "每级连击中断扣分+2，3级以上额外扣时间"
+        "perLevel": "每级连击中断扣分+2，3级以上额外扣时间",
+        "type": "数值"
       },
       "shackle": {
         "id": "shackle",
@@ -314,7 +319,8 @@ window.DUNGEON_DATA = {
         "desc": "答题流速增加",
         "maxLv": 0,
         "appliesOn": "FLOW",
-        "perLevel": "每级流速乘数+10%"
+        "perLevel": "每级流速乘数+10%",
+        "type": "数值"
       },
       "wave": {
         "id": "wave",
@@ -323,7 +329,8 @@ window.DUNGEON_DATA = {
         "desc": "手牌整体呈波浪状上下晃动，干扰视觉",
         "maxLv": 4,
         "appliesOn": "HAND_RENDER",
-        "perLevel": "每级向上位移12/26/54/110px"
+        "perLevel": "每级向上位移12/26/54/110px",
+        "type": "视觉"
       },
       "cyclone": {
         "id": "cyclone",
@@ -332,7 +339,8 @@ window.DUNGEON_DATA = {
         "desc": "随机锁定手牌位置，位置内卡牌持续旋转",
         "maxLv": 3,
         "appliesOn": "RENDER / HAND_RENDER",
-        "perLevel": "每级随机锁定1个位置；位置内当前及后续补入手牌顺时针旋转"
+        "perLevel": "每级随机锁定1个位置；位置内当前及后续补入手牌顺时针旋转",
+        "type": "视觉"
       }
     },
     "shop_coeff": {
