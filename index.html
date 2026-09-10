@@ -239,10 +239,10 @@ body {
 	.word-status { font-size: 13px; height: 16px; color: #e53935; font-weight: bold; }
 #soloStatus { position:absolute; top:84px; right:20px; font-size:18px; height:auto; min-height:20px; line-height:1.5; text-align:right; z-index:50; color:#f5a623; font-weight:bold; max-width:45vw; }
 
-.word-stars { display:flex; align-items:center; justify-content:center; gap:3px; min-height:24px; flex-wrap:wrap; max-width:123px; margin:0 auto; }
-.word-star { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; }
-.word-stars .word-star:nth-child(-n+5) { transform:translateY(-11px); }
-.word-stars .word-star:nth-child(n+6) { transform:translateX(11.5px); }
+.word-stars { display:flex; align-items:center; justify-content:center; gap:1px; min-height:20px; flex-wrap:wrap; max-width:123px; margin:0 auto; }
+.word-star { width:20px; height:18px; display:inline-flex; align-items:center; justify-content:center; }
+.word-stars .word-star:nth-child(-n+5) { transform:translateY(-8px); }
+.word-stars .word-star:nth-child(n+6) { transform:translateX(9px); }
 .word-star svg { filter:drop-shadow(0 0 1px rgba(0,0,0,0.2)); }
 .word-star.normal svg polygon { fill:#999; stroke:#fff; stroke-width:1.5; }
 .word-star.shiny-star svg polygon { fill:#7e57c2; stroke:#fff; stroke-width:1.5; }
@@ -951,7 +951,7 @@ body.uppercase-mode .card-inner { text-transform: uppercase; }
 .solo-word-timer { position:absolute; left:clamp(12px,4vw,30px); right:clamp(12px,4vw,30px); bottom:10px; width:auto; max-width:none; height:8px; border-radius:4px; background:#eee; overflow:hidden; }
 .solo-word-timer-fill { position:absolute; left:0; top:0; height:100%; width:100%; background:#4caf50; transition:width 0.1s linear, background-color 0.3s; z-index:2; }
 .solo-word-timer-ghost { position:absolute; left:0; top:0; height:100%; width:0; background:#555; z-index:1; }
-.solo-word-section { flex:1; width:auto; min-width:0; max-width:92vw; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; border:1px solid #e0e0e0; border-radius:14px; background:rgba(255,255,255,0.7); max-height:40%; position:relative; padding:15px clamp(12px,4vw,30px) 26px; overflow:hidden; }
+.solo-word-section { flex:1; width:100%; min-width:0; max-width:600px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; border:1px solid #e0e0e0; border-radius:14px; background:rgba(255,255,255,0.7); max-height:40%; position:relative; padding:15px clamp(12px,4vw,30px) 26px; overflow:hidden; }
 .solo-word-section.shiny { background:linear-gradient(135deg,#e0f7fa,#fff,#e8daef,#d1c4e9,#e0f7fa); background-size:300% 300%; animation:shinyBg 3s ease infinite; border-color:#b39ddb; box-shadow:0 0 15px rgba(179,157,219,0.3); }
 .solo-word-section.transitioning .current-word { opacity:0; transform:translateY(-8px); }
 .solo-word-section.entering .current-word { opacity:1; transform:translateY(0); }
@@ -1146,13 +1146,13 @@ body { font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; background:#f5f5f5
 .solo-word-section {
   border-radius: 0 !important;
   border: 2px solid #3a3a3a !important;
-  box-shadow: 3px 3px 0 0 #3a3a3a !important;
+  box-shadow: none !important;
 }
 .word-section.shiny, .solo-word-section.shiny {
   background: #f3e5f5 !important;
   animation: none !important;
   border-color: #400060 !important;
-  box-shadow: 3px 3px 0 0 #400060 !important;
+  box-shadow: none !important;
 }
 .letter-slot { border-radius: 0; }
 .letter-slot.next-slot { border-color: #2178d2; }

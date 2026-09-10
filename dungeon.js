@@ -1104,7 +1104,7 @@ style.textContent = `
 .dungeon-gold {
   display:inline-flex;align-items:center;
   padding:3px 12px;
-  background:#ffc107;border:3px solid #6b4500;border-radius:10px;
+  background:#ffc107;border:2px solid #fff;box-shadow:0 0 0 2px #3a3a3a;border-radius:9px;
   font-size:16px;font-weight:900;color:#3d2800;line-height:1;
 }
 .dshop-header-gold { position:absolute;left:0;top:50%;transform:translateY(-50%); }
