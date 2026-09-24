@@ -2,8 +2,8 @@
 // 源文件: GW配置表.xlsx
 // 用法: <script src="game_dungeon_data.js"></script> 后读 window.DUNGEON_DATA
 window.DUNGEON_DATA = {
-  "version": "20260909.174630",
-  "generatedAt": "2026-09-09T17:46:30",
+  "version": "20260923.151434",
+  "generatedAt": "2026-09-23T15:14:34",
   "source": "GW配置表.xlsx",
   "tables": {
     "attr_config": {
@@ -163,6 +163,7 @@ window.DUNGEON_DATA = {
         "desc": "每个流速tick降低答题流速",
         "category": "PASSIVE",
         "triggerOn": "TICK",
+        "value": 0.05,
         "remaining": -1,
         "shopZone": "G",
         "basePrice": 12,
@@ -189,6 +190,7 @@ window.DUNGEON_DATA = {
         "desc": "本题超时时恢复3秒",
         "category": "PASSIVE",
         "triggerOn": "TIMEOUT",
+        "value": 3,
         "remaining": 1,
         "shopZone": "T",
         "basePrice": 8,
@@ -202,6 +204,7 @@ window.DUNGEON_DATA = {
         "desc": "生命值降低时补一条命",
         "category": "PASSIVE",
         "triggerOn": "LIFE",
+        "value": 1,
         "remaining": 1,
         "shopZone": "T",
         "basePrice": 6,

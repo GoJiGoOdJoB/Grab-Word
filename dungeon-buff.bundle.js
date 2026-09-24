@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-09-09T17:46:30
+// 生成时间: 2026-09-23T15:14:34
 // 源文件数: 16
 // ============================================================
 
@@ -65,15 +65,15 @@ window.DungeonBuff = (function () {
   class PassiveBuff extends BaseBuff {
     onEvent(D, instance, eventType, payload) {
       var def = this.def;
-      if (!def || eventType !== def.triggerOn) return;
-      if (instance.remaining === 0) return;
-      this._applyEffect(D, instance, payload);
-      if (instance.remaining > 0) {
-        instance.remaining--;
-        if (instance.remaining === 0) removeBuff(D, instance.instanceId);
-      }
+      if (!def || instance.remaining === 0) return;
+      if (eventType !== def.triggerOn && !this._handlesEvent(eventType)) return;
+      var result = this._applyEffect(D, instance, payload, eventType) || { applied: false };
+      if (!result.applied) return;
+      if (instance.remaining > 0) instance.remaining--;
+      if (result.remove || instance.remaining === 0) removeBuff(D, instance.instanceId);
     }
-    _applyEffect(D, instance, payload) {} // 子类覆盖
+    _handlesEvent(eventType) { return false; }
+    _applyEffect(D, instance, payload, eventType) { return { applied: false }; }
   }
 
   class InstantBuff extends BaseBuff {
@@ -406,36 +406,49 @@ DungeonBuff.register('lucky', class extends DungeonBuff.PassiveBuff {
 
 // ---- buffs/passive/medkit.js ----
 // buffs/passive/medkit.js
-// TODO(medkit)：掉命时触发，补一条命
 DungeonBuff.register('medkit', class extends DungeonBuff.PassiveBuff {
-  _applyEffect(D, instance, payload) {
-    // TODO: 掉命时触发，补一条命
+  _handlesEvent(eventType) { return eventType === 'BEFORE_LIFE_LOSS'; }
+
+  _applyEffect(D, instance, payload, eventType) {
+    if (eventType !== 'BEFORE_LIFE_LOSS' || !payload || payload.blocked) return { applied: false };
+    payload.blocked = true;
+    payload.restoreLives = this.def.value || 1;
+    return { applied: true };
   }
 });
 
 // ---- buffs/passive/rewind.js ----
 // buffs/passive/rewind.js
-// TODO(rewind)：超时触发，恢复时间
 DungeonBuff.register('rewind', class extends DungeonBuff.PassiveBuff {
-  _applyEffect(D, instance, payload) {
-    // TODO: 超时触发，恢复时间
+  _handlesEvent(eventType) { return eventType === 'BEFORE_TIMEOUT'; }
+
+  _applyEffect(D, instance, payload, eventType) {
+    if (eventType !== 'BEFORE_TIMEOUT' || !payload || payload.blocked) return { applied: false };
+    payload.blocked = true;
+    payload.restoreTime = this.def.value;
+    return { applied: true };
   }
 });
 
 // ---- buffs/passive/shield.js ----
 // buffs/passive/shield.js
-// TODO(shield)：抵消错牌惩罚（免压力/冷却）
 DungeonBuff.register('shield', class extends DungeonBuff.PassiveBuff {
-  _applyEffect(D, instance, payload) {
-    // TODO: 抵消错牌惩罚（免压力/冷却）
+  _handlesEvent(eventType) { return eventType === 'BEFORE_WRONG'; }
+
+  _applyEffect(D, instance, payload, eventType) {
+    if (eventType !== 'BEFORE_WRONG' || !payload || payload.blocked || (payload.preventTimePenalty && payload.preventStress)) return { applied: false };
+    payload.preventTimePenalty = true;
+    payload.preventStress = true;
+    payload.preventExtraPenalty = true;
+    return { applied: true };
   }
 });
 
 // ---- buffs/passive/slowdown.js ----
 // buffs/passive/slowdown.js
-// TODO(slowdown)：每 tick 降低答题流速
 DungeonBuff.register('slowdown', class extends DungeonBuff.PassiveBuff {
-  _applyEffect(D, instance, payload) {
-    // TODO: 每 tick 降低答题流速
+  query(D, instance, queryKey) {
+    if (queryKey !== 'flowMultiplier') return null;
+    return { multiplier: 1 - (this.def.value || 0) };
   }
 });

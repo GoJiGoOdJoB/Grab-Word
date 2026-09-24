@@ -2843,6 +2843,8 @@ let S={
   wordFlowRate:1,
   wrongCount:0,
   wrongFlowPenalty:0,
+  wordSerial:0,
+  cardSerial:0,
 };
 
 function soloStage(){
@@ -2876,6 +2878,8 @@ function beginSoloGame(){
   S.wordFlowRate=1;
   S.wrongCount=0;
   S.wrongFlowPenalty=0;
+  S.wordSerial=0;
+  S.cardSerial=0;
   S.tierLock=soloLockedTier; // lock tier for this session
   // 地牢模式不锁定段位
   if(selectedSubmode==='dungeon') S.tierLock=null;
@@ -2888,17 +2892,19 @@ function beginSoloGame(){
   }
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
-  // 地牢模式初始化
+  const startGame=()=>{
+    soloUpdateStageUI();
+    soloUpdateTimerBar();
+    soloSetupWord();
+    soloStartTimer();
+  };
+  // 地牢模式初始化：配置就绪后才开始首题，避免读取空 Buff 配置。
   if(selectedSubmode==='dungeon' && window.Dungeon){
-    Dungeon.init();
-  } else if(window.Dungeon){
-    Dungeon.reset();
+    Dungeon.init().then(startGame).catch(err=>{S.running=false;alert(err.message);});
+  } else {
+    if(window.Dungeon) Dungeon.reset();
+    startGame();
   }
-
-  soloUpdateStageUI();
-  soloUpdateTimerBar();
-  soloSetupWord();
-  soloStartTimer();
 }
 
 function soloStartTimer(){
@@ -2996,18 +3002,19 @@ function soloUpdateTimerBar(){
   if(num) num.textContent = soloFormatTime();
 }
 
-function soloApplyWrongPenalty(){
+function soloApplyWrongPenalty(options){
+  options=options||{};
   const p=soloWrongPenalty();
   const dgn=(window.Dungeon && Dungeon.isActive());
   // flow rate penalty: 4th wrong onwards, +0.2 global flow each (勇气减伤·wrongFlow)
-  if(S.wrongCount>=4){
+  if(!options.preventExtraPenalty && S.wrongCount>=4){
     const fp=dgn?Dungeon.brvMitigate('wrongFlow',0.2):0.2;
     S.globalFlowRate+=fp;
     S.wrongFlowPenalty+=fp;
     document.getElementById('soloTimerWrap').classList.add('flow-penalty');
   }
   // word time penalty: reduce current layer ms (cascade across layers)
-  if(p.word>0){
+  if(!options.preventTimePenalty && p.word>0){
     const fill=document.getElementById('soloWordTimerFill');
     const ghost=document.getElementById('soloWordTimerGhost');
     const preWidth=Math.max(0,S.wordTimerMs/4000*100);
@@ -3049,7 +3056,7 @@ function soloApplyWrongPenalty(){
     soloUpdateStageUI();
   }
   // total time penalty
-  if(p.total>0){
+  if(!options.preventTimePenalty && p.total>0){
     if(!S.timeFractional)S.timeFractional=true;
     const totalPen=dgn?Dungeon.brvMitigate('totalTime',p.total):p.total;
     S.timeLeft=Math.max(0,S.timeLeft-totalPen);
@@ -3059,18 +3066,30 @@ function soloApplyWrongPenalty(){
 }
 
 function soloRollShiny(){
+  let c=soloStage().shinyC;
+  if(window.Dungeon && Dungeon.isActive()){
+    c+=Dungeon.getShinyBonus();
+    const q=Dungeon.query('shinyChanceMultiplier');
+    c=(c+q.additive)*q.multiplier;
+  }
   if(S.nextShiny){
     S.nextShiny=false;
     S.prdCounter=0;
-    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('SHINY');
+    if(window.Dungeon&&Dungeon.isActive()){
+      Dungeon.dispatch('SHINY_ROLL',{wordSerial:S.wordSerial,chance:c,isShiny:true});
+      Dungeon.dispatch('SHINY');
+    }
     return true;
   }
-  let c=soloStage().shinyC;
-  if(window.Dungeon && Dungeon.isActive()) c+=Dungeon.getShinyBonus();
   if(c<=0)return false;
   S.prdCounter++;
-  if(Math.random()<c*S.prdCounter){S.prdCounter=0;if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('SHINY');return true;}
-  return false;
+  const isShiny=Math.random()<c*S.prdCounter;
+  if(isShiny) S.prdCounter=0;
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.dispatch('SHINY_ROLL',{wordSerial:S.wordSerial,chance:c,isShiny:isShiny});
+    if(isShiny) Dungeon.dispatch('SHINY');
+  }
+  return isShiny;
 }
 
 function soloPickWord(bankOverride){
@@ -3080,6 +3099,7 @@ function soloPickWord(bankOverride){
 }
 
 function soloSetupWord(promoOverride){
+  S.wordSerial++;
   const st=promoOverride||soloStage();
   const blankCount=randInt(st.blanks[0],st.blanks[1]);
   S.blankCount=blankCount;
@@ -3104,6 +3124,9 @@ function soloSetupWord(promoOverride){
   S.wordTimerMs=4000; // ms remaining in current layer
   soloStartWordTimer();
   soloRenderAll();
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.dispatch('WORD_START',{wordSerial:S.wordSerial,wordId:S.currentWord.en,slots:S.slots,handTiles:Array.from(document.getElementById('soloHand').children)});
+  }
 }
 
 function soloLayerColor(layer,maxLayers){
@@ -3124,7 +3147,7 @@ function soloStartWordTimer(){
   fill.style.width='100%';
   S.wordTimer=setInterval(()=>{
     if(!S.running)return;
-    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('TICK');
+    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('TICK',{wordSerial:S.wordSerial,deltaMs:100});
     let flowMult = S.wordFlowRate*S.globalFlowRate;
     if(window.Dungeon && Dungeon.isActive()){
       flowMult *= Dungeon.getFlowRateMultiplier();
@@ -3149,13 +3172,26 @@ function soloStartWordTimer(){
 
       // negative layer: deduct 1 from total score + break all combos
       if(S.wordTimerLayer<0){
+        if(S.wordTimerLayer===-1){
+          const beforeTimeout=window.Dungeon&&Dungeon.isActive()?Dungeon.dispatch('BEFORE_TIMEOUT',{wordSerial:S.wordSerial,blocked:false,restoreTime:0}):null;
+          if(beforeTimeout&&beforeTimeout.blocked){
+            S.wordTimerLayer=0;
+            S.wordTimerMs=Math.max(1,(beforeTimeout.restoreTime||0)*1000);
+            fill.style.width=Math.min(100,S.wordTimerMs/4000*100)+'%';
+            fill.style.backgroundColor=soloLayerColor(S.wordTimerLayer,S.blankCount);
+            return;
+          }
+        }
         S.totalScore=Math.max(0,S.totalScore-1);
         S.stageScore-=1;
         soloUpdateStageUI();
         if(S.wordTimerLayer===-1){
           S.combo=0;S.burstCounter=0;S.burstQualities=[];
           soloUpdateCombo();
-          if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('TIMEOUT');
+          if(window.Dungeon&&Dungeon.isActive()){
+            Dungeon.dispatch('AFTER_TIMEOUT',{wordSerial:S.wordSerial,lostLayer:true,lostLife:false,ended:false});
+            Dungeon.dispatch('TIMEOUT');
+          }
         }
       }
     }
@@ -3201,7 +3237,7 @@ function soloRenderWord(){
     }
 	  container.appendChild(div);
 	});
-	if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('RENDER', { tiles: Array.from(container.children), handSize: S.hand.length });
+	if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('RENDER', { wordSerial:S.wordSerial, tiles: Array.from(container.children), handSize: S.hand.length });
 }
 
 function soloRenderHand(){
@@ -3218,7 +3254,7 @@ function soloRenderHand(){
   });
   bindCardTilt(c);
   c.querySelectorAll('.card').forEach(bindCardShadow);
-  if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('HAND_RENDER', { tiles: Array.from(c.children), slots: Array.from(c.children).map((tile, index) => ({ index:index + 1, tile:tile })) });
+  if(window.Dungeon && Dungeon.isActive()) Dungeon.dispatch('HAND_RENDER', { wordSerial:S.wordSerial, tiles: Array.from(c.children), slots: Array.from(c.children).map((tile, index) => ({ index:index + 1, tile:tile })) });
 }
 
 function soloPlayCard(idx){
@@ -3229,6 +3265,11 @@ function soloPlayCard(idx){
   if(nextBlank===-1)return;
 
   if(S.slots[nextBlank].letter!==letter){
+    const beforeWrong=window.Dungeon&&Dungeon.isActive()?Dungeon.dispatch('BEFORE_WRONG',{wordSerial:S.wordSerial,cardSerial:++S.cardSerial,blocked:false,preventTimePenalty:false,preventStress:false,preventExtraPenalty:false}):null;
+    if(beforeWrong&&beforeWrong.blocked){
+      if(beforeWrong.restoreTime){S.timeLeft+=beforeWrong.restoreTime;soloUpdateTimerBar();}
+      return;
+    }
     const container=document.getElementById('soloHand');
     const cardEl=container.children[idx];
     if(cardEl){cardEl.classList.add('shake-card','wrong-card');const _in=cardEl.querySelector('.card-inner');if(_in){_in.style.transition='';_in.style.transform='';}setTimeout(()=>cardEl.classList.remove('shake-card'),300);}
@@ -3241,18 +3282,27 @@ function soloPlayCard(idx){
     let cd=S.wrongCount>=3?1000:500;
     if(window.Dungeon && Dungeon.isActive()) cd=Dungeon.brvMitigate('wrongCooldown', cd);
     setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');if(cardEl)cardEl.classList.remove('wrong-card');},cd);
-    soloApplyWrongPenalty();
+    soloApplyWrongPenalty(beforeWrong||{});
     // 地牢：错牌压力(第3次起累计) — 勇气减伤
-    if(window.Dungeon && Dungeon.isActive() && S.wrongCount>=3){
-      Dungeon.addStress(Dungeon.brvMitigate('wrongStress', S.wrongCount - 2));
+    let appliedStress=0;
+    if(window.Dungeon && Dungeon.isActive() && !beforeWrong.preventStress && S.wrongCount>=3){
+      appliedStress=Dungeon.brvMitigate('wrongStress', S.wrongCount - 2);
+      Dungeon.addStress(appliedStress);
     }
-    if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('WRONG');
+    if(window.Dungeon&&Dungeon.isActive()){
+      Dungeon.dispatch('AFTER_WRONG',{wordSerial:S.wordSerial,cardSerial:S.cardSerial,appliedTimePenalty:!beforeWrong.preventTimePenalty,appliedStress:appliedStress,cooldown:cd});
+      Dungeon.dispatch('WRONG');
+    }
     return;
   }
 
   // correct letter
   S.slots[nextBlank].filled=true;
   S.slots[nextBlank].filledBy='p1';
+  const correctCardSerial=++S.cardSerial;
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.dispatch('CARD_CORRECT',{wordSerial:S.wordSerial,cardSerial:correctCardSerial,cardIndex:idx,letter:letter,isFirstCorrectInWord:S.slots.filter(s=>s.filledBy==='p1').length===1});
+  }
 
   // animate fly out + draw
   const containerBefore=document.getElementById('soloHand');
@@ -3329,9 +3379,12 @@ function soloCheckComplete(){
 
   // combo logic
   if(quality==='C'){
+    const previousCombo=S.combo;
     S.combo=0; // combo break
-    // 地牢：后悔诅咒生效
-    if(window.Dungeon && Dungeon.isActive()) Dungeon.applyRegret();
+    if(window.Dungeon && Dungeon.isActive()){
+      Dungeon.dispatch('COMBO_BREAK',{wordSerial:S.wordSerial,previousCombo:previousCombo,reason:'word_quality'});
+      Dungeon.applyRegret();
+    }
   } else {
     S.combo++;
   }
@@ -3388,6 +3441,9 @@ function soloCheckComplete(){
   soloUpdateStageUI();
   soloAddWordBook(quality);
   soloFlyStars(rawEarned, S.isShiny, comboBonus+burstBonus);
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.dispatch('WORD_COMPLETE',{wordSerial:S.wordSerial,isShiny:S.isShiny,rawScore:rawEarned,finalScore:totalPts+burstBonus});
+  }
 
   // check promotion conditions (not during promo question)
   if(S.isPromoQuestion){
@@ -3610,11 +3666,21 @@ function soloPromoFail(){
 
 function soloDemote(){
   clearInterval(S.wordTimer);
+  const beforeLife=window.Dungeon&&Dungeon.isActive()?Dungeon.dispatch('BEFORE_LIFE_LOSS',{wordSerial:S.wordSerial,blocked:false,restoreLives:0}):null;
+  if(beforeLife&&beforeLife.blocked){
+    if(beforeLife.restoreLives) S.lives+=beforeLife.restoreLives;
+    S.wordTimerMs=4000;
+    soloSetupWord();
+    return;
+  }
   const minIdx=S.tierLock?({easy:0,medium:3,hard:6}[S.tierLock]):0;
   S.stageIdx=Math.max(minIdx,S.stageIdx-1);
   S.stageScore=0;S.correctCount=0;S.streakCount=0;S.promoReady=false;S.isPromoQuestion=false;
   S.lives--;
-  if(window.Dungeon&&Dungeon.isActive())Dungeon.dispatch('LIFE');
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.dispatch('AFTER_LIFE_LOSS',{wordSerial:S.wordSerial,lostLives:1,lives:S.lives,ended:S.lives<=0});
+    Dungeon.dispatch('LIFE');
+  }
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
   const flash=document.createElement('div');

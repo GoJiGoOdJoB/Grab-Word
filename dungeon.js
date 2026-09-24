@@ -112,13 +112,22 @@ function dungeonAddLevel(buffId, delta){
 }
 
 // ===== 配置按需加载（不进主程序，进地牢时才注入）=====
+var dungeonDataPromise = null;
 function dungeonLoadData(){
-  if(window.DUNGEON_DATA) return;                               // 已加载
-  if(document.getElementById('dungeonDataScript')) return;      // 加载中
-  var s = document.createElement('script');
-  s.id  = 'dungeonDataScript';
-  s.src = 'game_dungeon_data.js';
-  document.head.appendChild(s);
+  if(window.DUNGEON_DATA) return Promise.resolve(window.DUNGEON_DATA);
+  if(dungeonDataPromise) return dungeonDataPromise;
+  dungeonDataPromise = new Promise(function(resolve, reject){
+    var s = document.getElementById('dungeonDataScript');
+    if(!s){
+      s = document.createElement('script');
+      s.id = 'dungeonDataScript';
+      s.src = 'game_dungeon_data.js';
+      document.head.appendChild(s);
+    }
+    s.onload = function(){ resolve(window.DUNGEON_DATA); };
+    s.onerror = function(){ dungeonDataPromise = null; reject(new Error('地牢配置加载失败')); };
+  });
+  return dungeonDataPromise;
 }
 
 // ===== 即时道具效果回调（供 DungeonBuff.InstantBuff 调用）=====
@@ -147,7 +156,8 @@ window.dungeonInstantRemoveCurse = function(v){
 
 // 初始化地牢模式
 function dungeonInit(){
-  D.active = true;
+  return dungeonLoadData().then(function(){
+    D.active = true;
   D.gold = 0;
   D.stress = 0;
   D.stressThreshold = DUNGEON_CFG.stressThresholdBase;
@@ -158,18 +168,19 @@ function dungeonInit(){
   D.shopVisitCount = 0;
   D.buyCounts = {};
   D.bossActive = false;
-  // 按需加载地牢配置（不进主程序，进地牢时才注入）
-  dungeonLoadData();
   // 切换单词簿为状态区
   const label = document.getElementById('soloBookLabel');
   if(label) label.textContent = '状态';
   dungeonRenderGoldUI();
   dungeonRenderStressBar();
   dungeonRenderStateArea();
+  });
 }
 
 function dungeonReset(){
   D.active = false;
+  D.buffs = [];
+  D._shackleFlowBonus = 0;
   // 恢复单词簿
   const label = document.getElementById('soloBookLabel');
   if(label) label.textContent = '单词簿';
@@ -293,10 +304,12 @@ function dungeonExitBoss(){
 
 // ===== 属性效果应用 =====
 
-// 流速修正(智慧)
+// 流速修正(智慧 + 道具 query)
 function dungeonGetFlowRateMultiplier(){
   if(!D.active) return 1;
-  return Math.max(0.3, 1 - getAttrEffect('wis', dungeonLevelOf('wis')));
+  var base = Math.max(0.3, 1 - getAttrEffect('wis', dungeonLevelOf('wis')));
+  var q = dungeonQuery('flowMultiplier');
+  return Math.max(0.1, (base + q.additive) * q.multiplier);
 }
 
 // 勇气减伤(brv)：最终伤害 = 原伤害 × (1 - 基础减伤系数 × 该惩罚修正)
@@ -313,10 +326,11 @@ function dungeonBrvMitigate(key, raw){
   return raw * (1 - reduce);
 }
 
-// 段位积分额外加成(力量)
+// 段位积分额外加成(力量 + 道具 query)
 function dungeonGetPromoScoreBonus(baseScore){
   if(!D.active) return 0;
-  return Math.round(baseScore * getAttrEffect('str', dungeonLevelOf('str')));
+  var q = dungeonQuery('promoScoreBonus');
+  return Math.round(baseScore * getAttrEffect('str', dungeonLevelOf('str')) + q.additive + baseScore * (q.multiplier - 1));
 }
 
 // 炫彩概率加成(技巧)
@@ -384,8 +398,10 @@ function dungeonShouldShowShop(stageIdx){
 }
 
 function dungeonOpenShop(){
-  D.shopVisitCount++;
-  dungeonRenderShop();
+  return dungeonLoadData().then(function(){
+    D.shopVisitCount++;
+    dungeonRenderShop();
+  });
 }
 
 function dungeonRenderShop(){
@@ -1367,7 +1383,26 @@ window.get_gold = function(n){
   return 'gold += ' + n + ' → ' + D.gold;
 };
 // 加 buff（属性/道具/诅咒）
+function dungeonBuffEffectText(v, cat, before, after, def){
+  var name = (def && def.name) || ATTR_NAMES[v] || (CURSE_DEFS[v] && CURSE_DEFS[v].name) || v;
+  if(cat==='ATTR'){
+    var labels = {str:'段位积分加成',wis:'答题流速降低',brv:'错牌惩罚降低',end:'压力累积降低',dex:'炫彩词概率加成',luk:'品质/诅咒运气加成'};
+    return name + '：' + labels[v] + ' ' + Math.round((before||0)*100) + '% → ' + Math.round((after||0)*100) + '%（Lv' + dungeonLevelOf(v) + '）';
+  }
+  if(cat==='CURSE') return name + '：' + ((def && def.desc) || (CURSE_DEFS[v] && CURSE_DEFS[v].desc) || '诅咒效果') + '，Lv' + before + ' → Lv' + after;
+  if(v==='shield') return name + '：错牌时抵消时间与压力惩罚，耐久 ' + before + ' → ' + after;
+  if(v==='rewind') return name + '：超时时恢复 ' + def.value + ' 秒并阻断本次超时，耐久 ' + before + ' → ' + after;
+  if(v==='slowdown') return name + '：答题流速 × ' + (1-def.value) + '，流速 ' + before.toFixed(2) + ' → ' + after.toFixed(2) + '，耐久无限';
+  if(v==='goldpot' || v==='buygold') return name + '：金币 +' + def.value + '，' + before + ' → ' + after;
+  if(v==='buytime') return name + '：剩余时间 +' + def.value + ' 秒，' + before + ' → ' + after;
+  if(v==='purify') return name + '：随机移除 ' + def.value + ' 层诅咒，诅咒总层数 ' + before + ' → ' + after;
+  return name + '：' + (def.desc || '效果已添加') + '，耐久 ' + before + ' → ' + after;
+}
+function dungeonCurseLevelTotal(){
+  return D.buffs.filter(function(b){ return b.category==='CURSE'; }).reduce(function(total, b){ return total + b.level; }, 0);
+}
 window.get_buff = function(v){
+  if(!window.DUNGEON_DATA) return dungeonLoadData().then(function(){ return window.get_buff(v); });
   if(typeof DungeonBuff==='undefined') return 'buff 系统未加载';
   var cat = dungeonBuffCategory(v);
   if(!cat) return '未找到 buff：' + v;
@@ -1375,10 +1410,13 @@ window.get_buff = function(v){
     var cur = dungeonLevelOf(v);
     var mx  = dungeonMaxLevelOf(v); // 0 = 无上限
     if(mx>0 && cur>=mx) return v + ' 已达上限 Lv' + mx + '，不再叠加';
+    var beforeEffect = cat==='ATTR' ? getAttrEffect(v, cur) : cur;
     dungeonAddLevel(v, 1);
     dungeonRenderStateArea();
     dungeonApplyCurseEffects();
-    return v + ' → Lv' + dungeonLevelOf(v);
+    var afterEffect = cat==='ATTR' ? getAttrEffect(v, dungeonLevelOf(v)) : dungeonLevelOf(v);
+    var config = (DungeonBuff.catalog().attr_config || {})[v] || (DungeonBuff.catalog().curse_config || {})[v];
+    return dungeonBuffEffectText(v, cat, beforeEffect, afterEffect, config);
   }
   // PASSIVE / INSTANT 道具
   var def = dungeonItemDef(v) || {};
@@ -1386,10 +1424,24 @@ window.get_buff = function(v){
   if(!repeatable && D.buffs.some(function(b){ return b.buffId===v; })){
     return v + ' 不可重复购买且已拥有，不再叠加';
   }
+  var before;
+  if(v==='shield' || v==='rewind') before = def.remaining;
+  else if(v==='slowdown') before = dungeonGetFlowRateMultiplier();
+  else if(v==='goldpot' || v==='buygold') before = D.gold;
+  else if(v==='buytime') before = typeof S!=='undefined' ? S.timeLeft : 0;
+  else if(v==='purify') before = dungeonCurseLevelTotal();
+  else before = def.remaining;
   DungeonBuff.addBuff(D, v);
   dungeonRenderStateArea();
   dungeonApplyCurseEffects();
-  return '已添加 ' + v;
+  var after;
+  if(v==='shield' || v==='rewind') after = dungeonBuffRemaining(v);
+  else if(v==='slowdown') after = dungeonGetFlowRateMultiplier();
+  else if(v==='goldpot' || v==='buygold') after = D.gold;
+  else if(v==='buytime') after = typeof S!=='undefined' ? S.timeLeft : 0;
+  else if(v==='purify') after = dungeonCurseLevelTotal();
+  else after = dungeonBuffRemaining(v);
+  return dungeonBuffEffectText(v, cat, before, after, def);
 };
 // 移除 buff（身上没有对应 key 则不执行）
 window.lost_buff = function(v){
@@ -1430,7 +1482,11 @@ function dungeonHasBuff(buffId){
 function dungeonBuffRemaining(buffId){
   var n = 0, has = false;
   for(var i=0;i<D.buffs.length;i++){
-    if(D.buffs[i].buffId===buffId){ has = true; n += (D.buffs[i].remaining||0); }
+    if(D.buffs[i].buffId===buffId){
+      has = true;
+      if(D.buffs[i].remaining===-1) return -1;
+      n += D.buffs[i].remaining || 0;
+    }
   }
   return has ? n : 0;
 }
