@@ -920,24 +920,114 @@ function dungeonFinishShopGesture(returnToSlot){
   if(!g) return;
   dungeonShopGesture = null;
   clearTimeout(g.timer);
+  window.removeEventListener('pointermove', dungeonShopPointerMove, true);
+  window.removeEventListener('pointerup', dungeonShopPointerUp, true);
+  window.removeEventListener('pointercancel', dungeonShopPointerCancel, true);
   g.card._dpressed = false;
   dungeonTiltReset(g.card);
-  if(g.card.hasPointerCapture(g.pointerId)) g.card.releasePointerCapture(g.pointerId);
-  g.card.classList.remove('dcard-drag-source');
-  if(g.clone){
+  if(g.raf) cancelAnimationFrame(g.raf);
+  const clone = g.clone;
+  if(clone){
     if(returnToSlot && g.card.isConnected){
       const rect = g.card.getBoundingClientRect();
-      g.clone.style.transition = 'left 0.18s ease-out,top 0.18s ease-out';
-      g.clone.style.left = rect.left+'px';
-      g.clone.style.top = rect.top+'px';
-      setTimeout(()=>g.clone.remove(),180);
-    } else g.clone.remove();
+      clone.style.transition = 'transform 0.22s cubic-bezier(.2,.8,.3,1.2)';
+      clone.style.transform = 'translate('+rect.left+'px,'+rect.top+'px) rotate(0deg) scale(1)';
+      setTimeout(()=>{clone.remove();g.card.classList.remove('dcard-drag-source');},220);
+    } else {
+      clone.remove();
+      g.card.classList.remove('dcard-drag-source');
+    }
   }
   document.getElementById('dungeonShopBuy')?.classList.remove('dshop-drop-target');
 }
 function dungeonClearShopInteraction(){
   dungeonFinishShopGesture(false);
   dungeonClearShopSelection();
+}
+function dungeonShopPointInBuy(x, y){
+  const btn = document.getElementById('dungeonShopBuy');
+  if(!btn) return false;
+  const r = btn.getBoundingClientRect();
+  return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+}
+function dungeonShopMoveClone(g){
+  document.getElementById('dungeonShopBuy')?.classList.toggle('dshop-drop-target', dungeonCanBuyCard(g.card) && dungeonShopPointInBuy(g.x, g.y));
+}
+// 拖拽物理：位置弹簧跟随指针，横向速度驱动摆角，摆角再用欠阻尼弹簧回正，产生惯性晃动
+function dungeonShopDragStep(g, now){
+  if(dungeonShopGesture!==g || !g.clone) return;
+  const dt = Math.min(0.033, Math.max(0.001, (now-(g.lastT||now))/1000 || 0.016));
+  g.lastT = now;
+  const tx = g.x-g.offsetX, ty = g.y-g.offsetY;
+  const posK = 900, posD = 2*Math.sqrt(posK)*0.9;
+  g.vx += ((tx-g.px)*posK - g.vx*posD)*dt;
+  g.vy += ((ty-g.py)*posK - g.vy*posD)*dt;
+  g.px += g.vx*dt;
+  g.py += g.vy*dt;
+  const targetRot = Math.max(-16, Math.min(16, g.vx*0.025));
+  const rotK = 260, rotD = 2*Math.sqrt(rotK)*0.28;
+  g.rv += ((targetRot-g.rot)*rotK - g.rv*rotD)*dt;
+  g.rot += g.rv*dt;
+  g.clone.style.transform = 'translate('+g.px+'px,'+g.py+'px) rotate('+g.rot+'deg) scale(1.06)';
+  g.raf = requestAnimationFrame(t=>dungeonShopDragStep(g, t));
+}
+function dungeonShopStartDrag(g){
+  const card = g.card;
+  dungeonClearShopSelection();
+  card._dskipClick = true;
+  card._dpressed = false;
+  dungeonTiltReset(card);
+  const rect = card.getBoundingClientRect();
+  g.offsetX = g.startX-rect.left;
+  g.offsetY = g.startY-rect.top;
+  const clone = card.cloneNode(true);
+  clone.classList.remove('dcard-selected');
+  clone.classList.add('dshop-drag-clone');
+  const srcInner = card.querySelector('.dcard-inner');
+  const cloneInner = clone.querySelector('.dcard-inner');
+  cloneInner.style.borderColor = getComputedStyle(srcInner).borderColor;
+  cloneInner.style.transition = 'none';
+  cloneInner.style.transform = '';
+  clone.style.position = 'fixed';
+  clone.style.left = '0px';
+  clone.style.top = '0px';
+  clone.style.width = rect.width+'px';
+  clone.style.height = rect.height+'px';
+  clone.style.transformOrigin = g.offsetX+'px '+Math.min(g.offsetY, rect.height*0.3)+'px';
+  g.px = rect.left; g.py = rect.top; g.vx = 0; g.vy = 0; g.rot = 0; g.rv = 0; g.lastT = 0;
+  clone.style.transform = 'translate('+g.px+'px,'+g.py+'px) scale(1.06)';
+  document.body.appendChild(clone);
+  g.clone = clone;
+  card.classList.add('dcard-drag-source');
+  dungeonShopMoveClone(g);
+  g.raf = requestAnimationFrame(t=>dungeonShopDragStep(g, t));
+}
+function dungeonShopPointerMove(e){
+  const g = dungeonShopGesture;
+  if(!g || g.pointerId!==e.pointerId) return;
+  g.x = e.clientX; g.y = e.clientY;
+  if(!g.clone){
+    if(Math.hypot(g.x-g.startX, g.y-g.startY)>8) g.card._dskipClick = true;
+    return;
+  }
+  e.preventDefault();
+  dungeonShopMoveClone(g);
+}
+function dungeonShopPointerUp(e){
+  const g = dungeonShopGesture;
+  if(!g || g.pointerId!==e.pointerId) return;
+  let bought = false;
+  if(g.clone){
+    e.preventDefault();
+    if(dungeonShopPointInBuy(e.clientX, e.clientY)) bought = dungeonBuyCard(g.card);
+  }
+  dungeonFinishShopGesture(!bought);
+}
+function dungeonShopPointerCancel(e){
+  const g = dungeonShopGesture;
+  if(!g || g.pointerId!==e.pointerId) return;
+  g.card._dskipClick = true;
+  dungeonFinishShopGesture(true);
 }
 function dungeonBindCardClicks(section, currency){
   section.querySelectorAll('.dcard').forEach(card=>{
@@ -954,61 +1044,17 @@ function dungeonBindCardClicks(section, currency){
         dungeonUpdatePurchaseButton();
       }
     });
+    card.addEventListener('dragstart', e=>e.preventDefault());
     card.addEventListener('pointerdown', e=>{
-      if(!e.isPrimary || e.button!==0) return;
+      if(!e.isPrimary || e.button!==0 || card.classList.contains('dcard-bought')) return;
       dungeonFinishShopGesture(false);
       card._dskipClick = false;
       const g = {card:card, pointerId:e.pointerId, x:e.clientX, y:e.clientY, startX:e.clientX, startY:e.clientY, clone:null};
       dungeonShopGesture = g;
-      card.setPointerCapture(e.pointerId);
-      g.timer = setTimeout(()=>{
-        if(dungeonShopGesture!==g) return;
-        dungeonClearShopSelection();
-        card._dskipClick = true;
-        dungeonTiltReset(card);
-        const rect = card.getBoundingClientRect();
-        g.offsetX = g.x-rect.left;
-        g.offsetY = g.y-rect.top;
-        g.clone = card.cloneNode(true);
-        g.clone.classList.remove('dcard-selected');
-        g.clone.classList.add('dshop-drag-clone');
-        const color = getComputedStyle(card.querySelector('.dcard-inner')).borderColor;
-        g.clone.querySelector('.dcard-inner').style.borderColor = color;
-        g.clone.querySelector('.dcard-inner').style.transform = '';
-        g.clone.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;height:'+rect.height+'px;';
-        document.body.appendChild(g.clone);
-        card.classList.add('dcard-drag-source');
-      },300);
-    });
-    card.addEventListener('pointermove', e=>{
-      const g = dungeonShopGesture;
-      if(!g || g.card!==card || g.pointerId!==e.pointerId) return;
-      g.x = e.clientX; g.y = e.clientY;
-      if(!g.clone){
-        if(Math.hypot(g.x-g.startX,g.y-g.startY)>8){clearTimeout(g.timer);card._dskipClick=true;}
-        return;
-      }
-      e.preventDefault();
-      g.clone.style.left = (g.x-g.offsetX)+'px';
-      g.clone.style.top = (g.y-g.offsetY)+'px';
-      const btn = document.getElementById('dungeonShopBuy');
-      const r = btn.getBoundingClientRect();
-      btn.classList.toggle('dshop-drop-target',dungeonCanBuyCard(card) && g.x>=r.left && g.x<=r.right && g.y>=r.top && g.y<=r.bottom);
-    });
-    card.addEventListener('pointerup', e=>{
-      const g = dungeonShopGesture;
-      if(!g || g.card!==card || g.pointerId!==e.pointerId) return;
-      let bought = false;
-      if(g.clone){
-        const r = document.getElementById('dungeonShopBuy').getBoundingClientRect();
-        if(e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) bought = dungeonBuyCard(card);
-        e.preventDefault();
-      }
-      dungeonFinishShopGesture(!bought);
-    });
-    card.addEventListener('pointercancel', ()=>{card._dskipClick=true;dungeonFinishShopGesture(false);dungeonClearShopSelection();});
-    card.addEventListener('lostpointercapture', ()=>{
-      if(dungeonShopGesture?.card===card){card._dskipClick=true;dungeonClearShopInteraction();}
+      window.addEventListener('pointermove', dungeonShopPointerMove, true);
+      window.addEventListener('pointerup', dungeonShopPointerUp, true);
+      window.addEventListener('pointercancel', dungeonShopPointerCancel, true);
+      g.timer = setTimeout(()=>{ if(dungeonShopGesture===g) dungeonShopStartDrag(g); },300);
     });
   });
 }
@@ -1231,14 +1277,15 @@ style.textContent = `
 .dshop-buy-ready,.dshop-buy.dshop-drop-target { background:#b48b00;color:#fff; }
 .dcard { touch-action:none; }
 .dcard-selected .dcard-inner { outline:2px solid #ffc107;outline-offset:2px; }
-.dcard-drag-source { visibility:hidden; }
+.dcard-drag-source { opacity:0.25; }
+.dcard.dshop-drag-clone { pointer-events:none;z-index:1000;margin:0;cursor:grabbing;will-change:transform; }
+.dcard.dshop-drag-clone::before { display:none; }
 .dshop-description { position:fixed;z-index:1100;background:#fff;border:2px solid #3a3a3a;box-sizing:border-box;padding:0;overflow-y:auto;font-size:12px;line-height:1.5;box-shadow:2px 3px 0 rgba(0,0,0,.18); }
 .dshop-description-part { padding:7px 9px;overflow-wrap:anywhere; }
 .dshop-description-part + .dshop-description-part { border-top:1px solid #ccc; }
 .dshop-description strong { display:block;font-size:13px; }
 .dcard-curse .dcard-body-curse { min-height:100px; }
 .dcard-curse .dcurse-curse-cn { font-size:12px;line-height:1.4; }
-.dshop-drag-clone { margin:0; }
 @keyframes dungeonCurseFlash {
   0%{opacity:1} 100%{opacity:0}}
 
