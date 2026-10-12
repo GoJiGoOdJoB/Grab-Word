@@ -938,20 +938,35 @@ function dungeonFinishShopGesture(returnToSlot){
       g.card.classList.remove('dcard-drag-source');
     }
   }
-  document.getElementById('dungeonShopBuy')?.classList.remove('dshop-drop-target');
+  if(g.ring){
+    const ring = g.ring;
+    ring.classList.remove('is-hover');
+    setTimeout(()=>ring.remove(),200);
+  }
+  document.getElementById('dungeonShopBuy')?.classList.remove('dshop-buy-morphed');
 }
 function dungeonClearShopInteraction(){
   dungeonFinishShopGesture(false);
   dungeonClearShopSelection();
 }
-function dungeonShopPointInBuy(x, y){
-  const btn = document.getElementById('dungeonShopBuy');
-  if(!btn) return false;
-  const r = btn.getBoundingClientRect();
+// 购买键投放判定：未悬停时用按键矩形；悬停变成圆圈后用圆圈半径判定（带滞回，避免边缘闪烁）
+const DSHOP_RING_SIZE = 360;
+function dungeonShopPointInBuy(g, x, y){
+  const r = g.buyRect;
+  if(!r) return false;
+  if(g.overBuy){
+    const cx = r.left+r.width/2, cy = r.top+r.height/2;
+    return Math.hypot(x-cx, y-cy) <= DSHOP_RING_SIZE/2;
+  }
   return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
 }
 function dungeonShopMoveClone(g){
-  document.getElementById('dungeonShopBuy')?.classList.toggle('dshop-drop-target', dungeonCanBuyCard(g.card) && dungeonShopPointInBuy(g.x, g.y));
+  g.overBuy = dungeonShopPointInBuy(g, g.x, g.y);
+  if(g.ring){
+    g.ring.classList.toggle('is-hover', g.overBuy);
+    g.ring.classList.toggle('is-ready', dungeonCanBuyCard(g.card));
+  }
+  document.getElementById('dungeonShopBuy')?.classList.toggle('dshop-buy-morphed', g.overBuy);
 }
 // 拖拽物理：位置弹簧跟随指针，横向速度驱动摆角，摆角再用欠阻尼弹簧回正，产生惯性晃动
 function dungeonShopDragStep(g, now){
@@ -998,6 +1013,18 @@ function dungeonShopStartDrag(g){
   clone.style.transform = 'translate('+g.px+'px,'+g.py+'px) scale(1.06)';
   document.body.appendChild(clone);
   g.clone = clone;
+  const buyBtn = document.getElementById('dungeonShopBuy');
+  if(buyBtn){
+    g.buyRect = buyBtn.getBoundingClientRect();
+    const ring = document.createElement('div');
+    ring.className = 'dshop-buy-ring';
+    ring.textContent = '购买';
+    ring.style.width = ring.style.height = DSHOP_RING_SIZE+'px';
+    ring.style.left = (g.buyRect.left+g.buyRect.width/2-DSHOP_RING_SIZE/2)+'px';
+    ring.style.top = (g.buyRect.top+g.buyRect.height/2-DSHOP_RING_SIZE/2)+'px';
+    document.body.appendChild(ring);
+    g.ring = ring;
+  }
   card.classList.add('dcard-drag-source');
   dungeonShopMoveClone(g);
   g.raf = requestAnimationFrame(t=>dungeonShopDragStep(g, t));
@@ -1007,8 +1034,9 @@ function dungeonShopPointerMove(e){
   if(!g || g.pointerId!==e.pointerId) return;
   g.x = e.clientX; g.y = e.clientY;
   if(!g.clone){
-    if(Math.hypot(g.x-g.startX, g.y-g.startY)>8) g.card._dskipClick = true;
-    return;
+    if(Math.hypot(g.x-g.startX, g.y-g.startY)<=6) return;
+    clearTimeout(g.timer);
+    dungeonShopStartDrag(g);
   }
   e.preventDefault();
   dungeonShopMoveClone(g);
@@ -1019,7 +1047,7 @@ function dungeonShopPointerUp(e){
   let bought = false;
   if(g.clone){
     e.preventDefault();
-    if(dungeonShopPointInBuy(e.clientX, e.clientY)) bought = dungeonBuyCard(g.card);
+    if(dungeonShopPointInBuy(g, e.clientX, e.clientY)) bought = dungeonBuyCard(g.card);
   }
   dungeonFinishShopGesture(!bought);
 }
@@ -1054,7 +1082,7 @@ function dungeonBindCardClicks(section, currency){
       window.addEventListener('pointermove', dungeonShopPointerMove, true);
       window.addEventListener('pointerup', dungeonShopPointerUp, true);
       window.addEventListener('pointercancel', dungeonShopPointerCancel, true);
-      g.timer = setTimeout(()=>{ if(dungeonShopGesture===g) dungeonShopStartDrag(g); },300);
+      g.timer = setTimeout(()=>{ if(dungeonShopGesture===g) dungeonShopStartDrag(g); },150);
     });
   });
 }
@@ -1272,11 +1300,30 @@ function dungeonApplyCardTilt(container){
 const style = document.createElement('style');
 style.textContent = `
 .dshop-footer { width:100%;display:flex;justify-content:space-between;gap:12px; }
-.dshop-buy { border:3px solid #a78000;background:#fff;color:#6b4500;padding:10px 32px;font-size:15px;font-weight:900;cursor:pointer; }
+.dshop-buy { border:3px solid #a78000;background:#fff;color:#6b4500;padding:10px 32px;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 0 0 0 #6b4500;transition:opacity 0.15s,transform 0.12s,box-shadow 0.12s,background 0.12s,color 0.12s; }
 .dshop-buy:disabled { cursor:default;opacity:1; }
-.dshop-buy-ready,.dshop-buy.dshop-drop-target { background:#b48b00;color:#fff; }
+/* 可购买：变实心并浮起，阴影用深金色而非纯黑，悬停/按下与「继续前进」一致地压下 */
+.dshop-buy-ready { background:#b48b00;color:#fff;box-shadow:3px 3px 0 0 #6b4500; }
+.dshop-buy-ready:hover { box-shadow:1px 1px 0 0 #6b4500;transform:translate(2px,2px); }
+.dshop-buy-ready:active { box-shadow:none;transform:translate(3px,3px); }
+.dshop-buy.dshop-buy-morphed { opacity:0;transform:scale(0.7); }
+/* 拖拽时购买键化身的圆圈：fixed 于 body，z-index 低于被拖商品(1000)，始终在商品下方 */
+.dshop-buy-ring {
+  position:fixed;z-index:999;pointer-events:none;box-sizing:border-box;
+  border-radius:50%;border:3px solid #a78000;background:rgba(255,255,255,0.85);color:#6b4500;
+  display:flex;align-items:flex-start;justify-content:center;padding-top:44px;
+  font-family:inherit;font-size:24px;font-weight:900;
+  opacity:0;transform:scale(0.45);
+  transition:transform 0.2s cubic-bezier(.2,.8,.3,1.35),opacity 0.15s,background 0.15s,color 0.15s;
+}
+.dshop-buy-ring.is-hover { opacity:1;transform:scale(1); }
+.dshop-buy-ring.is-ready { background:#b48b00;color:#fff; }
 .dcard { touch-action:none; }
-.dcard-selected .dcard-inner { outline:2px solid #ffc107;outline-offset:2px; }
+.dcard-selected .dcard-inner { outline:3px solid var(--dsel,#3a3a3a);outline-offset:2px; }
+.dshop-section-g { --dsel:#e0a100; }
+.dshop-section-p { --dsel:#2f7fe0; }
+.dshop-section-t { --dsel:#3fa34d; }
+.dshop-section-c { --dsel:#9c27b0; }
 .dcard-drag-source { opacity:0.25; }
 .dcard.dshop-drag-clone { pointer-events:none;z-index:1000;margin:0;cursor:grabbing;will-change:transform; }
 .dcard.dshop-drag-clone::before { display:none; }
