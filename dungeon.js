@@ -178,6 +178,7 @@ function dungeonInit(){
 }
 
 function dungeonReset(){
+  dungeonClearShopInteraction();
   D.active = false;
   D.buffs = [];
   D._shackleFlowBonus = 0;
@@ -405,6 +406,7 @@ function dungeonOpenShop(){
 }
 
 function dungeonRenderShop(){
+  dungeonClearShopInteraction();
   // Hide game content below promo bar + hide promo bar
   const els = ['soloWordSection','soloStatus'];
   els.forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
@@ -447,9 +449,21 @@ function dungeonRenderShop(){
   // Continue button
   const footer = document.createElement('div');
   footer.className = 'dshop-footer';
-  footer.innerHTML = `<button class="dshop-continue" id="dungeonShopContinue">继续前进 →</button>`;
+  footer.innerHTML = `<button class="dshop-buy" id="dungeonShopBuy" disabled>购买</button><button class="dshop-continue" id="dungeonShopContinue">继续前进 →</button>`;
   area.appendChild(footer);
 
+  document.getElementById('dungeonShopBuy').onclick = ()=>dungeonBuyCard(dungeonShopSelected);
+  if(!area._dshopBound){
+    area._dshopBound = true;
+    area.addEventListener('click', e=>{
+      if(!e.target.closest('.dcard, #dungeonShopBuy')) dungeonClearShopSelection();
+    });
+    area.addEventListener('scroll', dungeonClearShopSelection);
+    document.addEventListener('click', e=>{
+      if(dungeonShopSelected && !area.contains(e.target) && !dungeonShopDescription?.contains(e.target)) dungeonClearShopSelection();
+    });
+    window.addEventListener('resize', dungeonClearShopInteraction);
+  }
   document.getElementById('dungeonShopContinue').onclick = dungeonCloseShop;
   if(typeof playSound==='function'){playSound(523,0.15);setTimeout(()=>playSound(784,0.15),100);setTimeout(()=>playSound(1047,0.2),200);}
 
@@ -675,8 +689,15 @@ const CURSE_COMBO_DEFS = [
 
 // 诅咒组合卡片 HTML
 function dungeonCurseCardHTML(combo){
+  const preview = [];
+  for(let i=0;i<combo.curses;i++){
+    const key = CURSE_KEYS[Math.floor(Math.random()*CURSE_KEYS.length)];
+    const entry = preview.find(c=>c.key===key);
+    if(entry) entry.levels++;
+    else preview.push({key:key, levels:1});
+  }
   return `
-    <div class="dcard dcard-curse" data-item="${combo.itemId}" data-curse="${combo.curseKey}" data-curses="${combo.curses}">
+    <div class="dcard dcard-curse" data-item="${combo.itemId}" data-preview='${JSON.stringify(preview)}'>
       <div class="dcard-inner">
       <div class="dcard-body dcard-body-curse">
         <div class="dcurse-half dcurse-item-half">
@@ -686,8 +707,8 @@ function dungeonCurseCardHTML(combo){
         </div>
         <div class="dcurse-half dcurse-curse-half">
           <div class="dcurse-icon dcurse-curse-icon"></div>
-          <span class="dcurse-curse-cn">${combo.curseName}</span>
-          <span class="dcurse-curse-en">${combo.curseNameEn}</span>
+          <span class="dcurse-curse-cn">${preview.map(c=>CURSE_DEFS[c.key].name+' ×'+c.levels).join('<br>')}</span>
+          <span class="dcurse-curse-en">${preview.reduce((n,c)=>n+c.levels,0)} 层诅咒</span>
         </div>
       </div>
       </div>
@@ -713,19 +734,7 @@ function dungeonRenderCSection(){
     </div>
   `;
 
-  // 绑定点击
-  section.querySelectorAll('.dcard-curse').forEach(card=>{
-    card.addEventListener('click', ()=>{
-      if(card.classList.contains('dcard-bought')) return;
-      card.classList.add('dcard-bought');
-      // 触发道具效果
-      dungeonApplyItemEffect(card.dataset.item);
-      // 附加对应诅咒
-      const n = parseInt(card.dataset.curses) || 1;
-      for(let i=0;i<n;i++) dungeonTriggerCurse();
-      dungeonRenderStateArea();
-    });
-  });
+  dungeonBindCardClicks(section, 'c');
 
   return section;
 }
@@ -735,6 +744,7 @@ function dungeonBindRerollBtn(section){
   const btn = section.querySelector('.dshop-reroll[data-price]');
   if(!btn) return;
   btn.addEventListener('click', ()=>{
+    dungeonClearShopInteraction();
     const price = parseInt(btn.dataset.price);
     const cur   = btn.dataset.cur;
     if(!dungeonCanAfford(price, cur)){
@@ -743,7 +753,10 @@ function dungeonBindRerollBtn(section){
     }
     btn.classList.add('full-press');
     setTimeout(()=>{
+      if(!section.isConnected) return;
+      dungeonClearShopInteraction();
       btn.classList.remove('full-press');
+      if(!dungeonCanAfford(price, cur)) return;
       dungeonDeductCost(price, cur);
       // 刷新本区域所有卡片（重新渲染 section）
       const grid = section.querySelector('.dshop-grid');
@@ -784,12 +797,7 @@ function dungeonUpdateDisabledState(){
     const price = parseInt(card.dataset.price);
     const cur   = card.dataset.cur;
     const numEl = card.querySelector('.dcard-cost-num');
-    if(!numEl || !price || !cur) return;
-    if(dungeonCanAfford(price, cur)){
-      numEl.classList.remove('unaffordable');
-    } else {
-      numEl.classList.add('unaffordable');
-    }
+    if(numEl) numEl.classList.toggle('unaffordable',!dungeonCanBuyCard(card));
   });
   // 刷新按钮：文字红/正常
   area.querySelectorAll('.dshop-reroll[data-price]').forEach(btn=>{
@@ -802,6 +810,7 @@ function dungeonUpdateDisabledState(){
       btn.classList.add('unaffordable');
     }
   });
+  dungeonUpdatePurchaseButton();
 }
 
 // 沉闷音效（低频短促，模拟"无法操作"）
@@ -810,41 +819,196 @@ function dungeonPlayDullSound(){
   playSound(90, 0.12, 0.45);
 }
 
-// 绑定卡片点击购买
+var dungeonShopSelected = null;
+var dungeonShopGesture = null;
+var dungeonShopDescription = null;
+
+function dungeonClearShopSelection(){
+  if(dungeonShopSelected) dungeonShopSelected.classList.remove('dcard-selected');
+  dungeonShopSelected = null;
+  if(dungeonShopDescription) dungeonShopDescription.remove();
+  dungeonShopDescription = null;
+  dungeonUpdatePurchaseButton();
+}
+function dungeonCanBuyCard(card){
+  if(!card || !card.isConnected || card.classList.contains('dcard-bought')) return false;
+  if(card.dataset.attr && dungeonLevelOf(card.dataset.attr)>=dungeonMaxLevelOf(card.dataset.attr)) return false;
+  if(card.dataset.item && !dungeonItemRepeatable(card.dataset.item) && D.buffs.some(b=>b.buffId===card.dataset.item)) return false;
+  return card.classList.contains('dcard-curse') || dungeonCanAfford(Number(card.dataset.price), card.dataset.cur);
+}
+function dungeonUpdatePurchaseButton(){
+  const btn = document.getElementById('dungeonShopBuy');
+  if(!btn) return;
+  const ready = dungeonCanBuyCard(dungeonShopSelected);
+  btn.disabled = !ready;
+  btn.classList.toggle('dshop-buy-ready', ready);
+}
+function dungeonShowCardDescription(card){
+  const t = DungeonBuff.catalog();
+  const parts = [];
+  if(card.dataset.attr){
+    const def = t.attr_config[card.dataset.attr];
+    parts.push({name:def.name, desc:def.desc, extra:'Lv.'+dungeonLevelOf(def.id)+' → Lv.'+(dungeonLevelOf(def.id)+1)});
+  } else {
+    const def = (t.item_config || {})[card.dataset.item];
+    const combo = CURSE_COMBO_DEFS.find(c=>c.itemId===card.dataset.item);
+    parts.push({name:def ? def.name : combo.itemName, desc:def ? def.desc : '该道具效果尚未配置', extra:def && def.perLevel});
+    if(card.dataset.preview) JSON.parse(card.dataset.preview).forEach(c=>{
+      const def = (t.curse_config || {})[c.key] || CURSE_DEFS[c.key];
+      parts.push({name:def.name+' ×'+c.levels, desc:def.desc, extra:def.perLevel});
+    });
+  }
+  const box = document.createElement('div');
+  box.className = 'dshop-description';
+  box.style.borderColor = getComputedStyle(card.querySelector('.dcard-inner')).borderColor;
+  parts.forEach(part=>{
+    const section = document.createElement('div');
+    section.className = 'dshop-description-part';
+    const title = document.createElement('strong');
+    title.textContent = part.name;
+    section.appendChild(title);
+    const text = document.createElement('div');
+    text.textContent = part.desc || '说明尚未配置';
+    section.appendChild(text);
+    if(part.extra){
+      const extra = document.createElement('div');
+      extra.textContent = part.extra;
+      section.appendChild(extra);
+    }
+    box.appendChild(section);
+  });
+  document.body.appendChild(box);
+  dungeonShopDescription = box;
+  const rect = card.getBoundingClientRect();
+  const bounds = document.getElementById('dungeonShopArea').getBoundingClientRect();
+  const leftBound = Math.max(8,bounds.left);
+  const rightBound = Math.min(window.innerWidth-8,bounds.right);
+  box.style.width = Math.min(240,rightBound-leftBound)+'px';
+  box.style.maxHeight = Math.max(40,window.innerHeight-16)+'px';
+  const size = box.getBoundingClientRect();
+  const left = Math.min(Math.max(leftBound,rect.left),rightBound-size.width);
+  let top = rect.top-size.height-8;
+  if(top<8) top = rect.bottom+8;
+  box.style.left = left+'px';
+  box.style.top = Math.max(8,Math.min(top,window.innerHeight-size.height-8))+'px';
+}
+function dungeonBuyCard(card){
+  if(!dungeonCanBuyCard(card)){
+    dungeonPlayDullSound();
+    dungeonUpdatePurchaseButton();
+    return false;
+  }
+  card.classList.add('dcard-bought');
+  if(!card.classList.contains('dcard-curse')) dungeonDeductCost(Number(card.dataset.price), card.dataset.cur);
+  const id = card.dataset.attr || card.dataset.item;
+  D.buyCounts[id] = (D.buyCounts[id]||0)+1;
+  if(card.dataset.attr) dungeonAddLevel(id,1);
+  else dungeonApplyItemEffect(id);
+  if(card.dataset.preview) JSON.parse(card.dataset.preview).forEach(c=>dungeonAddLevel(c.key,c.levels));
+  dungeonApplyCurseEffects();
+  dungeonRenderStateArea();
+  const slot = document.createElement('div');
+  slot.className = 'dshop-empty-slot';
+  slot.style.minHeight = card.getBoundingClientRect().height+'px';
+  card.replaceWith(slot);
+  dungeonClearShopSelection();
+  dungeonUpdateDisabledState();
+  return true;
+}
+function dungeonFinishShopGesture(returnToSlot){
+  const g = dungeonShopGesture;
+  if(!g) return;
+  dungeonShopGesture = null;
+  clearTimeout(g.timer);
+  g.card._dpressed = false;
+  dungeonTiltReset(g.card);
+  if(g.card.hasPointerCapture(g.pointerId)) g.card.releasePointerCapture(g.pointerId);
+  g.card.classList.remove('dcard-drag-source');
+  if(g.clone){
+    if(returnToSlot && g.card.isConnected){
+      const rect = g.card.getBoundingClientRect();
+      g.clone.style.transition = 'left 0.18s ease-out,top 0.18s ease-out';
+      g.clone.style.left = rect.left+'px';
+      g.clone.style.top = rect.top+'px';
+      setTimeout(()=>g.clone.remove(),180);
+    } else g.clone.remove();
+  }
+  document.getElementById('dungeonShopBuy')?.classList.remove('dshop-drop-target');
+}
+function dungeonClearShopInteraction(){
+  dungeonFinishShopGesture(false);
+  dungeonClearShopSelection();
+}
 function dungeonBindCardClicks(section, currency){
   section.querySelectorAll('.dcard').forEach(card=>{
-    card.addEventListener('click', ()=>{
+    card.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(card._dskipClick){card._dskipClick=false;return;}
       if(card.classList.contains('dcard-bought')) return;
-      const price = parseInt(card.dataset.price);
-      const cur   = card.dataset.cur;
-      if(!dungeonCanAfford(price, cur)) {
-        dungeonPlayDullSound();
+      const same = dungeonShopSelected===card;
+      dungeonClearShopSelection();
+      if(!same){
+        dungeonShopSelected = card;
+        card.classList.add('dcard-selected');
+        dungeonShowCardDescription(card);
+        dungeonUpdatePurchaseButton();
+      }
+    });
+    card.addEventListener('pointerdown', e=>{
+      if(!e.isPrimary || e.button!==0) return;
+      dungeonFinishShopGesture(false);
+      card._dskipClick = false;
+      const g = {card:card, pointerId:e.pointerId, x:e.clientX, y:e.clientY, startX:e.clientX, startY:e.clientY, clone:null};
+      dungeonShopGesture = g;
+      card.setPointerCapture(e.pointerId);
+      g.timer = setTimeout(()=>{
+        if(dungeonShopGesture!==g) return;
+        dungeonClearShopSelection();
+        card._dskipClick = true;
+        dungeonTiltReset(card);
+        const rect = card.getBoundingClientRect();
+        g.offsetX = g.x-rect.left;
+        g.offsetY = g.y-rect.top;
+        g.clone = card.cloneNode(true);
+        g.clone.classList.remove('dcard-selected');
+        g.clone.classList.add('dshop-drag-clone');
+        const color = getComputedStyle(card.querySelector('.dcard-inner')).borderColor;
+        g.clone.querySelector('.dcard-inner').style.borderColor = color;
+        g.clone.querySelector('.dcard-inner').style.transform = '';
+        g.clone.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;height:'+rect.height+'px;';
+        document.body.appendChild(g.clone);
+        card.classList.add('dcard-drag-source');
+      },300);
+    });
+    card.addEventListener('pointermove', e=>{
+      const g = dungeonShopGesture;
+      if(!g || g.card!==card || g.pointerId!==e.pointerId) return;
+      g.x = e.clientX; g.y = e.clientY;
+      if(!g.clone){
+        if(Math.hypot(g.x-g.startX,g.y-g.startY)>8){clearTimeout(g.timer);card._dskipClick=true;}
         return;
       }
-      // 通用规则：不可重复道具已拥有则拒绝购买（防御，池渲染已排除）
-      const clickItemId = card.dataset.item;
-      if(clickItemId && !card.classList.contains('dcard-attr') &&
-         !dungeonItemRepeatable(clickItemId) && D.buffs.some(b=>b.buffId===clickItemId)){
-        dungeonPlayDullSound();
-        return;
+      e.preventDefault();
+      g.clone.style.left = (g.x-g.offsetX)+'px';
+      g.clone.style.top = (g.y-g.offsetY)+'px';
+      const btn = document.getElementById('dungeonShopBuy');
+      const r = btn.getBoundingClientRect();
+      btn.classList.toggle('dshop-drop-target',dungeonCanBuyCard(card) && g.x>=r.left && g.x<=r.right && g.y>=r.top && g.y<=r.bottom);
+    });
+    card.addEventListener('pointerup', e=>{
+      const g = dungeonShopGesture;
+      if(!g || g.card!==card || g.pointerId!==e.pointerId) return;
+      let bought = false;
+      if(g.clone){
+        const r = document.getElementById('dungeonShopBuy').getBoundingClientRect();
+        if(e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) bought = dungeonBuyCard(card);
+        e.preventDefault();
       }
-      dungeonDeductCost(price, cur);
-      card.classList.add('dcard-bought');
-      // 执行效果
-      if(card.classList.contains('dcard-attr')){
-        const attrKey = card.dataset.attr;
-        D.buyCounts[attrKey] = (D.buyCounts[attrKey]||0) + 1;
-        dungeonAddLevel(attrKey, 1);
-        dungeonApplyCurseEffects();
-        dungeonRenderStateArea();
-      } else {
-        const itemId = card.dataset.item;
-        D.buyCounts[itemId] = (D.buyCounts[itemId]||0) + 1;
-        dungeonApplyItemEffect(itemId);
-        dungeonRenderStateArea();
-      }
-      // 购买后重新评估所有卡片可购买状态
-      dungeonUpdateDisabledState();
+      dungeonFinishShopGesture(!bought);
+    });
+    card.addEventListener('pointercancel', ()=>{card._dskipClick=true;dungeonFinishShopGesture(false);dungeonClearShopSelection();});
+    card.addEventListener('lostpointercapture', ()=>{
+      if(dungeonShopGesture?.card===card){card._dskipClick=true;dungeonClearShopInteraction();}
     });
   });
 }
@@ -879,6 +1043,7 @@ function dungeonApplyItemEffect(itemId){
 }
 
 function dungeonCloseShop(){
+  dungeonClearShopInteraction();
   // Hide shop area
   const area = document.getElementById('dungeonShopArea');
   if(area){ area.style.display='none'; area.innerHTML=''; }
@@ -1032,7 +1197,7 @@ function dungeonApplyCardTilt(container){
   container.addEventListener('pointermove', e=>{
     const el = e.target.closest(DTILT_SELECTOR);
     if(!el || !container.contains(el)) return;
-    if(el.classList.contains('dcard-bought')) return;
+    if(el.classList.contains('dcard-bought') || dungeonShopGesture?.clone) return;
     dungeonTiltTransform(el, e, el._dpressed);
   });
   container.addEventListener('pointerout', e=>{
@@ -1060,6 +1225,20 @@ function dungeonApplyCardTilt(container){
 }
 const style = document.createElement('style');
 style.textContent = `
+.dshop-footer { width:100%;display:flex;justify-content:space-between;gap:12px; }
+.dshop-buy { border:3px solid #a78000;background:#fff;color:#6b4500;padding:10px 32px;font-size:15px;font-weight:900;cursor:pointer; }
+.dshop-buy:disabled { cursor:default;opacity:1; }
+.dshop-buy-ready,.dshop-buy.dshop-drop-target { background:#b48b00;color:#fff; }
+.dcard { touch-action:none; }
+.dcard-selected .dcard-inner { outline:2px solid #ffc107;outline-offset:2px; }
+.dcard-drag-source { visibility:hidden; }
+.dshop-description { position:fixed;z-index:1100;background:#fff;border:2px solid #3a3a3a;box-sizing:border-box;padding:0;overflow-y:auto;font-size:12px;line-height:1.5;box-shadow:2px 3px 0 rgba(0,0,0,.18); }
+.dshop-description-part { padding:7px 9px;overflow-wrap:anywhere; }
+.dshop-description-part + .dshop-description-part { border-top:1px solid #ccc; }
+.dshop-description strong { display:block;font-size:13px; }
+.dcard-curse .dcard-body-curse { min-height:100px; }
+.dcard-curse .dcurse-curse-cn { font-size:12px;line-height:1.4; }
+.dshop-drag-clone { margin:0; }
 @keyframes dungeonCurseFlash {
   0%{opacity:1} 100%{opacity:0}}
 
