@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "npx serve . -p 3000 -s",
-    "start": "npx serve . -p 3000 -s"
+    "start": "npx serve . -p 3000 -s",
+    "test": "node test/protocol.test.js"
   }
 }

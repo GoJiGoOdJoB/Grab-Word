@@ -1,6 +1,6 @@
 // ============================================================
 // dungeon-buff.bundle.js —— 由 build_buffs.py 自动生成，请勿手动编辑。
-// 生成时间: 2026-09-23T15:14:34
+// 生成时间: 2026-10-14T22:49:27
 // 源文件数: 16
 // ============================================================
 
@@ -80,9 +80,9 @@ window.DungeonBuff = (function () {
     onAdd(D, instance) {
       var def = this.def || {};
       if (def.effect === 'ADD_GOLD' && typeof window.dungeonInstantAddGold === 'function') {
-        window.dungeonInstantAddGold(def.value);
+        window.dungeonInstantAddGold(def.value, instance);
       } else if (def.effect === 'ADD_TIME' && typeof window.dungeonInstantAddTime === 'function') {
-        window.dungeonInstantAddTime(def.value);
+        window.dungeonInstantAddTime(def.value, instance);
       } else if (def.effect === 'RM_CURSE' && typeof window.dungeonInstantRemoveCurse === 'function') {
         window.dungeonInstantRemoveCurse(def.value);
       }
@@ -149,14 +149,255 @@ window.DungeonBuff = (function () {
     D.buffs.splice(idx, 1);
   }
 
+  function letterGroup(letter) {
+    var normalized = String(letter || '').toUpperCase();
+    if (!/^[A-Z]$/.test(normalized)) return null;
+    if ('ETAOI'.includes(normalized)) return 'HIGH';
+    if ('KXJQZ'.includes(normalized)) return 'LOW';
+    if ('NRLCMPWB'.includes(normalized)) return 'MID_A';
+    return 'MID_B';
+  }
+
+  function normalizePos(pos) {
+    var mapping = {
+      n: 'NOUN', v: 'VERB', vt: 'VERB', vi: 'VERB',
+      adj: 'ADJECTIVE', adv: 'ADVERB', prep: 'FUNCTION',
+      conj: 'FUNCTION', pron: 'FUNCTION', art: 'FUNCTION',
+      det: 'FUNCTION', num: 'NUMERAL', int: 'INTERJECTION', interj: 'INTERJECTION'
+    };
+    var tags = [], unknown = [];
+    var tokens = String(pos || '').toLowerCase().split(/[\s.,;/&、，；]+/).filter(Boolean);
+    tokens.forEach(function (token) {
+      var tag = mapping[token];
+      if (tag) {
+        if (!tags.includes(tag)) tags.push(tag);
+      } else if (!unknown.includes(token)) unknown.push(token);
+    });
+    return { posTags: tags.length ? tags : ['UNKNOWN'], unknownPos: unknown };
+  }
+
+  function startWord(D, input) {
+    var pos = normalizePos(input.pos);
+    var positions = input.actualBlankPositions.slice();
+    D.wordContext = {
+      runSerial: D.runSerial,
+      wordSerial: input.wordSerial,
+      wordId: input.wordId,
+      spelling: input.spelling,
+      plannedBlankCount: input.plannedBlankCount,
+      actualBlankPositions: positions,
+      actualBlankCount: positions.length,
+      posTags: pos.posTags,
+      unknownPos: pos.unknownPos,
+      handLetters: input.handLetters.slice()
+    };
+    D.wordResults = { wrongResults: [], interruptions: [] };
+    return wordContext(D);
+  }
+
+  function recordWordResult(D, type, result) {
+    var results = D.wordResults;
+    if (!results) return;
+    var list = type === 'wrong' ? results.wrongResults : results.interruptions;
+    if (result.eventSerial != null && list.some(function (entry) {
+      return entry.eventSerial === result.eventSerial && entry.reason === result.reason;
+    })) return;
+    list.push(Object.assign({}, result));
+  }
+
+  function wordResults(D) {
+    var results = D.wordResults || { wrongResults: [], interruptions: [] };
+    return {
+      wrongResults: results.wrongResults.map(function (entry) { return Object.assign({}, entry); }),
+      interruptions: results.interruptions.map(function (entry) { return Object.assign({}, entry); })
+    };
+  }
+
+  function wordContext(D) {
+    var context = D.wordContext;
+    if (!context) return { runSerial: D.runSerial };
+    return Object.assign({}, context, {
+      actualBlankPositions: context.actualBlankPositions.slice(),
+      posTags: context.posTags.slice(),
+      unknownPos: context.unknownPos.slice(),
+      handLetters: context.handLetters.slice()
+    });
+  }
+
+  // ---- 本局上下文与事件标识（P0：纯数据、可去重）----
+  function beginRun(D) {
+    D.runSerial = (D.runSerial || 0) + 1;
+    D.eventSerial = 0;
+    D.eventKeys = new Set();     // 去重键 runSerial:eventType:eventSerial
+    D.pendingIntents = [];       // 待提交意图
+    D._intentKeys = new Set();   // 本局意图去重（跨提交持久）
+    D._txSeq = 0;
+    D._settledTx = new Set();    // 已结算 transactionId
+    D._txRecords = {};
+    D.resourceLog = [];          // 资源变化记录（来源可查）
+    D.wordContext = null;
+    D.wordResults = null;
+    D._currentEventKey = null;
+    D._observingSettlement = false;
+  }
+
+  function clearRun(D) {
+    if (!D.buffs) D.buffs = [];
+    var snapshot = D.buffs.slice();
+    for (var i = 0; i < snapshot.length; i++) {
+      removeBuff(D, snapshot[i].instanceId); // 每个仍存实例恰一次 onRemove
+    }
+    D.eventKeys = new Set();
+    D.pendingIntents = [];
+    D._intentKeys = new Set();
+    D._settledTx = new Set();
+    D._txRecords = {};
+    D.resourceLog = [];
+    D.wordContext = null;
+    D.wordResults = null;
+    D._currentEventKey = null;
+    D._observingSettlement = false;
+  }
+
+  // 资源提交：唯一 owner 为主游戏（dungeon.js 注册 applier），本层只做
+  // 来源记录、上下限执行与 transactionId 去重。记录保留请求值与实际值。
+  var resourceAppliers = {};
+  function registerResourceApplier(resource, fn) { resourceAppliers[resource] = fn; }
+
+  function settleResource(D, intent) {
+    intent = intent || {};
+    if (intent.transactionId == null) {
+      intent.transactionId = 'tx' + (D.runSerial || 0) + '_' + (++D._txSeq || (D._txSeq = 1));
+    }
+    var txId = intent.transactionId;
+    if (D._settledTx.has(txId)) {
+      return { applied: false, deduped: true, transactionId: txId, record: D._txRecords[txId] || null };
+    }
+    var record = {
+      transactionId: txId,
+      eventKey: intent.eventKey || null, // runSerial:eventType:eventSerial
+      wordSerial: intent.wordSerial == null ? null : intent.wordSerial,
+      resource: intent.resource,
+      requestedDelta: intent.requestedDelta,
+      actualDelta: 0,
+      before: null,
+      after: null,
+      sourceCategory: intent.sourceCategory || null, // BASE/ATTR/ITEM/CURSE/PURCHASE
+      sourceReason: intent.sourceReason || null,
+      sourceInstanceId: intent.sourceInstanceId || null,
+      intentKey: intent.intentKey || null,
+    };
+    var fn = resourceAppliers[intent.resource];
+    var result = null;
+    if (typeof fn === 'function') result = fn(intent.requestedDelta, intent, D) || null;
+    if (result) {
+      record.actualDelta = typeof result.actualDelta === 'number' ? result.actualDelta : 0;
+      record.before = result.before == null ? null : result.before;
+      record.after = result.after == null ? null : result.after;
+    }
+    D._settledTx.add(txId);
+    D._txRecords[txId] = record;
+    D.resourceLog.push(record);
+    return { applied: !!result && record.actualDelta !== 0, deduped: false, transactionId: txId, record: record };
+  }
+
+  // ---- 附加意图收集与提交（固定排序；同批新增实例不参加本次收集）----
+  // 意图优先级（P0 语义阶段，同级按来源 id + intentKey 稳定排序，与注册顺序无关）：
+  //   10 收集奖励 / 20 依赖附加段位总量的惩罚 / 30 正向压力（含阈值检测）
+  //   40 减压 / 50 连击兑现 / 60 资源奖励 / 70 额外连击（最后加入）
+  var INTENT_PRIORITY = { collect: 10, rankPenalty: 20, stressUp: 30, stressDown: 40, comboRedeem: 50, reward: 60, extraCombo: 70 };
+  var intentAppliers = {};
+  function registerIntentApplier(type, fn) { intentAppliers[type] = fn; }
+
+  function collectIntent(D, intent) {
+    if (D._observingSettlement) return null;
+    if (!D.pendingIntents) D.pendingIntents = [];
+    if (intent.eventKey == null && D._currentEventKey) intent.eventKey = D._currentEventKey;
+    D.pendingIntents.push(intent);
+    return intent;
+  }
+
+  function intentRank(intent) {
+    if (typeof intent.priority === 'number') return intent.priority;
+    return INTENT_PRIORITY[intent.type] != null ? INTENT_PRIORITY[intent.type] : 60;
+  }
+
+  function commitIntents(D, baseSnapshot) {
+    var list = (D.pendingIntents || []).slice(); // 快照：提交中新收集不参加
+    D.pendingIntents = [];
+    list.sort(function (a, b) {
+      var pa = intentRank(a), pb = intentRank(b);
+      if (pa !== pb) return pa - pb;
+      var sa = String(a.sourceId || ''), sb = String(b.sourceId || '');
+      if (sa !== sb) return sa < sb ? -1 : 1;
+      var ia = String(a.intentKey || ''), ib = String(b.intentKey || '');
+      return ia < ib ? -1 : (ia > ib ? 1 : 0);
+    });
+    var seenKeys = D._intentKeys || (D._intentKeys = new Set());
+    var results = [];
+    for (var i = 0; i < list.length; i++) {
+      var intent = list[i];
+      if (intent.sourceInstanceId && !(D.buffs || []).some(function (instance) {
+        return instance.instanceId === intent.sourceInstanceId && instance.remaining !== 0;
+      })) {
+        results.push({ intent: intent, applied: false, reason: 'removedSource' });
+        continue;
+      }
+      var dedupKey = (D.runSerial || 0) + ':' + (intent.eventKey || (baseSnapshot && baseSnapshot.wordSerial) || '') + ':' + (intent.sourceInstanceId || intent.sourceId || '') + ':' + (intent.intentKey || ('auto' + i));
+      if (intent.intentKey && seenKeys.has(dedupKey)) {
+        results.push({ intent: intent, applied: false, deduped: true });
+        continue;
+      }
+      if (intent.intentKey) seenKeys.add(dedupKey);
+      var fn = intentAppliers[intent.type];
+      var res = null;
+      if (typeof fn === 'function') res = fn(D, intent, baseSnapshot || null) || null;
+      var applied = !!(res && res.applied);
+      var out = { intent: intent, applied: applied, result: res || null };
+      // 有限耐久：仅在实际生效后确认一次；无收益/未生效/重复不扣
+      if (applied && intent.sourceInstanceId && res.consumeDurability !== false) {
+        var inst = null;
+        for (var j = 0; j < (D.buffs || []).length; j++) {
+          if (D.buffs[j].instanceId === intent.sourceInstanceId) { inst = D.buffs[j]; break; }
+        }
+        if (inst && typeof inst.remaining === 'number' && inst.remaining > 0) {
+          inst.remaining--;
+          if (inst.remaining === 0) removeBuff(D, inst.instanceId);
+        }
+      }
+      results.push(out);
+    }
+    return results;
+  }
+
   // 派发游戏事件。返回 payload：允许「可拦截 / 可修正」型道具在 onEvent 里
   // 写回字段（如 payload.blocked / payload.mult），主游戏据此决定后续行为。
+  // P0：调用前确认实例仍存在（派发中被移除者不再执行）；调用方可携带
+  // eventSerial 实现同一结果事件重复派发去重（键 runSerial:eventType:eventSerial）。
   function dispatchEvent(D, eventType, payload) {
     payload = payload || {};
     if (!D.buffs) return payload;
+    if (payload.eventSerial == null) payload.eventSerial = ++D.eventSerial;
+    var key = (D.runSerial || 0) + ':' + eventType + ':' + payload.eventSerial;
+    if (D.eventKeys && D.eventKeys.has(key)) {
+      payload._deduped = true;
+      return payload;
+    }
+    if (D.eventKeys) D.eventKeys.add(key);
+    payload._eventKey = key;
     var snapshot = D.buffs.slice();
-    for (var i = 0; i < snapshot.length; i++) {
-      getBuffHandler(snapshot[i].buffId).onEvent(D, snapshot[i], eventType, payload);
+    var previousEventKey = D._currentEventKey;
+    var previousObservation = D._observingSettlement;
+    D._currentEventKey = key;
+    D._observingSettlement = previousObservation || eventType === 'AFTER_WORD_SETTLEMENT' || eventType === 'AFTER_CARD_SETTLEMENT';
+    try {
+      for (var i = 0; i < snapshot.length; i++) {
+        if (D.buffs.indexOf(snapshot[i]) === -1) continue; // 派发期间被移除：跳过
+        getBuffHandler(snapshot[i].buffId).onEvent(D, snapshot[i], eventType, payload);
+      }
+    } finally {
+      D._currentEventKey = previousEventKey;
+      D._observingSettlement = previousObservation;
     }
     return payload;
   }
@@ -183,10 +424,24 @@ window.DungeonBuff = (function () {
     getBuffHandler: getBuffHandler,
     addBuff: addBuff,
     removeBuff: removeBuff,
+    beginRun: beginRun,
+    startWord: startWord,
+    wordContext: wordContext,
+    recordWordResult: recordWordResult,
+    wordResults: wordResults,
+    letterGroup: letterGroup,
+    normalizePos: normalizePos,
+    clearRun: clearRun,
     dispatchEvent: dispatchEvent,
     query: query,
     catalog: catalog,
     getAttrEffect: getAttrEffect,
+    settleResource: settleResource,
+    registerResourceApplier: registerResourceApplier,
+    collectIntent: collectIntent,
+    commitIntents: commitIntents,
+    registerIntentApplier: registerIntentApplier,
+    INTENT_PRIORITY: INTENT_PRIORITY,
   };
 })();
 

@@ -131,14 +131,14 @@ function dungeonLoadData(){
 }
 
 // ===== 即时道具效果回调（供 DungeonBuff.InstantBuff 调用）=====
-window.dungeonInstantAddGold = function(v){
-  D.gold += (v||0);
-  dungeonRenderGoldUI();
+window.dungeonInstantAddGold = function(v,instance){
+  return dungeonChangeResource('gold',v||0,{sourceCategory:'ITEM',sourceReason:'instant',sourceInstanceId:instance.instanceId});
 };
-window.dungeonInstantAddTime = function(v){
+window.dungeonInstantAddTime = function(v,instance){
   if(typeof S!=='undefined'){
-    S.timeLeft += (v||0);
+    const result=dungeonChangeResource('time',v||0,{sourceCategory:'ITEM',sourceReason:'instant',sourceInstanceId:instance.instanceId});
     if(typeof soloUpdateTimerBar==='function') soloUpdateTimerBar();
+    return result;
   }
 };
 window.dungeonInstantRemoveCurse = function(v){
@@ -157,6 +157,7 @@ window.dungeonInstantRemoveCurse = function(v){
 // 初始化地牢模式
 function dungeonInit(){
   return dungeonLoadData().then(function(){
+    if(typeof DungeonBuff!=='undefined') DungeonBuff.clearRun(D);
     D.active = true;
   D.gold = 0;
   D.stress = 0;
@@ -165,6 +166,8 @@ function dungeonInit(){
   D.wrongCountSession = 0;
   D.tempCurses = [];
   D.buffs = [];
+  if(typeof DungeonBuff!=='undefined') DungeonBuff.beginRun(D);
+  D._suppRankTotal = 0;
   D.shopVisitCount = 0;
   D.buyCounts = {};
   D.bossActive = false;
@@ -180,6 +183,7 @@ function dungeonInit(){
 function dungeonReset(){
   dungeonClearShopInteraction();
   D.active = false;
+  if(typeof DungeonBuff!=='undefined') DungeonBuff.clearRun(D); // 先逐实例 onRemove，再清空本局上下文
   D.buffs = [];
   D._shackleFlowBonus = 0;
   // 恢复单词簿
@@ -193,18 +197,33 @@ function dungeonReset(){
 // ===== 压力值系统 =====
 
 function dungeonAddStress(amount){
-  if(!D.active) return;
+  if(!D.active) return { applied:false, reason:'inactive' };
+  const input = amount;
   const endReduction = getAttrEffect('end', dungeonLevelOf('end'));
-  const actual = Math.max(0, Math.round(amount * (1 - endReduction)));
+  const actual = Math.max(0, Math.round(input * (1 - endReduction))); // 逐笔取整，规则不变
+  const enduranceAbsorbed = Math.max(0, Math.round(input) - actual);  // 取整损失不算耐力收益
+  const before = D.stress;
   D.stress += actual;
-  dungeonRenderStressBar();
-  // 检查阈值
+  const thresholdEvents = [];
   while(D.stress >= D.stressThreshold){
     D.stress -= D.stressThreshold;
     D.stressTriggerCount++;
+    const curseBefore = dungeonCurseLevelTotal();
     dungeonTriggerCurse();
+    thresholdEvents.push({ threshold: D.stressThreshold, consumed: D.stressThreshold, curseLevelGained: dungeonCurseLevelTotal() - curseBefore });
   }
   dungeonRenderStressBar();
+  return {
+    applied: actual > 0 || thresholdEvents.length > 0,
+    requested: input,
+    enduranceBeforeInput: input,
+    enduranceReduction: endReduction,
+    actualAdded: actual,
+    enduranceAbsorbed: enduranceAbsorbed,
+    before: before,
+    after: D.stress,
+    thresholdEvents: thresholdEvents,
+  };
 }
 
 function dungeonTriggerCurse(){
@@ -243,10 +262,16 @@ function dungeonShowCurseEffect(curseKey){
 
 // ===== 金币系统 =====
 
-function dungeonAddGold(amount){
+function dungeonChangeResource(resource, delta, source){
+  const context=source||{};
+  const reason=context.sourceReason||resource;
+  const eventKey=D._currentEventKey||((D.runSerial||0)+':'+reason+':'+(++D.eventSerial));
+  return DungeonBuff.settleResource(D,Object.assign({resource:resource,requestedDelta:delta,sourceCategory:'BASE',sourceReason:reason,eventKey:eventKey,wordSerial:typeof S!=='undefined'?S.wordSerial:null},context));
+}
+
+function dungeonAddGold(amount, source){
   if(!D.active) return;
-  D.gold += amount;
-  dungeonRenderGoldUI();
+  return dungeonChangeResource('gold',amount,source);
 }
 
 function dungeonSpendGold(amount){
@@ -254,6 +279,179 @@ function dungeonSpendGold(amount){
   D.gold -= amount;
   dungeonRenderGoldUI();
   return true;
+}
+
+// ===== P0 结算基建：来源记录 / 独立减压 / 连击兑现 / 分维度计时 =====
+
+// 金币变化执行（上下限沿用既有规则：不为负；不新增上限）
+function dungeonApplyGoldDelta(delta){
+  const before = D.gold;
+  let actual = (delta || 0);
+  if(before + actual < 0) actual = -before;
+  D.gold = before + actual;
+  dungeonRenderGoldUI();
+  return { applied: actual !== 0, requestedDelta: delta || 0, actualDelta: actual, before: before, after: D.gold };
+}
+
+// 独立减压入口（5.2）：最多减至0，不经勇气/耐力，不撤销诅咒，不用负数 addStress
+function dungeonReduceStress(amount){
+  const before = D.stress;
+  const requested = Math.max(0, amount || 0);
+  const actual = Math.min(requested, before);
+  D.stress = before - actual;
+  if(actual > 0) dungeonRenderStressBar();
+  return { applied: actual > 0, requested: requested, actual: actual, before: before, after: D.stress };
+}
+
+// 分维度计时（7.1）：专用因子 = max(0.1,(1+additive)*multiplier)，每 tick 现算不累计
+function dungeonGetTotalTimeFlowMultiplier(){
+  if(!D.active) return 1;
+  const q = dungeonQuery('totalTimeFlowMultiplier');
+  return Math.max(0.1, (1 + q.additive) * q.multiplier);
+}
+function dungeonGetWordTimeFlowMultiplier(){
+  if(!D.active) return 1;
+  const q = dungeonQuery('wordTimeFlowMultiplier');
+  return Math.max(0.1, (1 + q.additive) * q.multiplier);
+}
+
+// ---- 资源 applier：主游戏是唯一资源 owner，本层只经它执行 ----
+if(typeof DungeonBuff !== 'undefined'){
+  DungeonBuff.registerResourceApplier('gold', function(delta, intent, DRef){
+    return dungeonApplyGoldDelta(delta);
+  });
+  ['score','rankScore','time'].forEach(function(resource){
+    DungeonBuff.registerResourceApplier(resource,function(delta,intent){
+      const field={score:'totalScore',rankScore:'stageScore',time:'timeLeft'}[resource];
+      const before=S[field];
+      let after=before+delta;
+      if(resource!=='rankScore') after=Math.max(0,after);
+      if(intent.maxValue!=null) after=Math.min(intent.maxValue,after);
+      S[field]=after;
+      return {before:before,after:after,actualDelta:after-before};
+    });
+  });
+  ['score','time'].forEach(function(resource){
+    DungeonBuff.registerIntentApplier(resource,function(DRef,intent){
+      const r=dungeonChangeResource(resource,intent.value,{sourceCategory:'ITEM',sourceReason:'supplemental',sourceInstanceId:intent.sourceInstanceId,intentKey:intent.intentKey,eventKey:intent.eventKey});
+      return {applied:r.applied,actualDelta:r.record.actualDelta};
+    });
+  });
+  DungeonBuff.registerIntentApplier('gold', function(DRef, intent){
+    const r = dungeonChangeResource('gold',intent.value,{sourceCategory:'ITEM',sourceReason:'supplemental',sourceInstanceId:intent.sourceInstanceId,intentKey:intent.intentKey,eventKey:intent.eventKey});
+    return { applied: r.applied, actualDelta: r.record.actualDelta, before: r.record.before, after: r.record.after };
+  });
+  DungeonBuff.registerIntentApplier('stressUp', function(DRef, intent){
+    const r = dungeonAddStress(intent.value);
+    return { applied: !!r.applied, actualDelta: r.actualAdded, stressResult: r };
+  });
+  DungeonBuff.registerIntentApplier('stressDown', function(DRef, intent){
+    const r = dungeonReduceStress(intent.value);
+    return { applied: !!r.applied, actualDelta: r.actual };
+  });
+  // 附加段位分：只进本词道具累计，不进总积分P；晋级仍由主游戏完成流程检查
+  DungeonBuff.registerIntentApplier('rankScore', function(DRef, intent){
+    const result=dungeonChangeResource('rankScore',intent.value||0,{sourceCategory:'ITEM',sourceReason:'supplemental',sourceInstanceId:intent.sourceInstanceId,intentKey:intent.intentKey,eventKey:intent.eventKey});
+    DRef._suppRankTotal = (DRef._suppRankTotal || 0) + result.record.actualDelta;
+    return { applied: result.applied, actualDelta: result.record.actualDelta };
+  });
+}
+
+// ---- 连击协议（6.x）：独立消费入口 + 原子兑现；自然断连 COMBO_BREAK 保持原样 ----
+
+// 独立消费：不重算本词分、不清爆发、不派发自然断连、不触发后悔额外惩罚
+function dungeonConsumeCombo(count){
+  const n = Math.floor(count || 0);
+  if(n <= 0) return { applied: false, reason: 'invalid' };
+  const before = S.combo;
+  if(before < n) return { applied: false, reason: 'insufficient', requested: n, before: before, after: before };
+  S.combo = before - n;
+  return { applied: true, requested: n, before: before, after: S.combo };
+}
+
+// 原子兑现：成本与收益一并提交；前置或实际收益不满足则整笔拒绝，不扣连击
+function dungeonRedeemCombo(intent){
+  intent = intent || {};
+  const cost = Math.floor(intent.comboCost || 0);
+  const before = S.combo;
+  if(cost<=0) return {applied:false,reason:'invalidCost',comboBefore:before};
+  if(intent.minStress!=null && D.stress<intent.minStress) return {applied:false,reason:'insufficientStress',comboBefore:before};
+  if(before < cost) return { applied: false, reason: 'insufficientCombo', comboBefore: before };
+  const reward = intent.reward || {};
+  if(reward.type === 'reduceStress'){
+    const r = dungeonReduceStress(reward.value);
+    if(!r.applied) return { applied: false, reason: 'noEffectiveReward', comboBefore: before };
+    S.combo = before - cost; // 成本与收益同一次提交中结算
+    return { applied: true, comboConsumed: cost, comboBefore: before, comboAfter: before - cost, reward: { type: reward.type, requested: reward.value, actual: r.actual } };
+  }
+  if(reward.type === 'gold'){
+    if(!(reward.value > 0)) return { applied: false, reason: 'noEffectiveReward', comboBefore: before };
+    const r = dungeonApplyGoldDelta(reward.value);
+    S.combo = before - cost; // 成本与收益同一次提交中结算
+    return { applied: true, comboConsumed: cost, comboBefore: before, comboAfter: before - cost, reward: { type: reward.type, requested: reward.value, actual: r.actualDelta } };
+  }
+  return { applied: false, reason: 'unknownReward', comboBefore: before };
+}
+
+function dungeonCollectRankPenalties(snapshot){
+  const seen=new Set(D._intentKeys||[]);
+  const pendingRank=(D.pendingIntents||[]).reduce(function(total,intent){
+    if(intent.type!=='rankScore') return total;
+    if(intent.sourceInstanceId && !D.buffs.some(function(inst){return inst.instanceId===intent.sourceInstanceId && inst.remaining!==0;})) return total;
+    const key=(D.runSerial||0)+':'+(intent.eventKey||snapshot.wordSerial||'')+':'+(intent.sourceInstanceId||intent.sourceId||'')+':'+intent.intentKey;
+    if(intent.intentKey && seen.has(key)) return total;
+    if(intent.intentKey) seen.add(key);
+    return total+(intent.value||0);
+  },0);
+  dungeonDispatch('COLLECT_RANK_PENALTIES',Object.assign({},snapshot,{supplementalRankTotal:(D._suppRankTotal||0)+pendingRank}));
+}
+
+function dungeonSettleCard(cardCtx){
+  if(!D.active || cardCtx._deduped) return null;
+  const snapshot=Object.assign({},cardCtx,{baseScore:0,baseGold:0});
+  dungeonCollectRankPenalties(snapshot);
+  const results=DungeonBuff.commitIntents(D,snapshot);
+  const result={wordSerial:cardCtx.wordSerial,cardSerial:cardCtx.cardSerial,baseSnapshot:snapshot,intents:results,supplementalRankTotal:D._suppRankTotal||0};
+  dungeonDispatch('AFTER_CARD_SETTLEMENT',result);
+  return result;
+}
+
+// ---- 出牌/完成附加结算（4.3）：快照基础值 → 固定顺序提交 → 派发最终结果 ----
+function dungeonSettleWord(wordCtx){
+  if(!D.active || wordCtx._deduped) return null;
+  const baseSnapshot = Object.freeze({
+    wordSerial: wordCtx.wordSerial,
+    baseScore: wordCtx.finalScore || 0,
+    baseGold: wordCtx.baseResources ? wordCtx.baseResources.gold : 0,
+    baseResources: Object.freeze(Object.assign({},wordCtx.baseResources)),
+    comboBeforeItemSettlement: wordCtx.comboBeforeItemSettlement,
+  });
+  const completion=dungeonDispatch('WORD_COMPLETE',Object.assign({},wordCtx,{baseResources:baseSnapshot.baseResources,baseSnapshot:baseSnapshot}));
+  if(completion._deduped) return null;
+  dungeonCollectRankPenalties(baseSnapshot);
+  const results = DungeonBuff.commitIntents(D, baseSnapshot);
+  const settlement = {
+    wordSerial: baseSnapshot.wordSerial,
+    baseSnapshot: baseSnapshot,
+    intents: results,
+    supplementalRankTotal: D._suppRankTotal || 0,
+    finalResources: { score:S.totalScore, rankScore:S.stageScore, gold:D.gold, time:S.timeLeft, combo:S.combo },
+  };
+  DungeonBuff.dispatchEvent(D, 'AFTER_WORD_SETTLEMENT', settlement);
+  return settlement;
+}
+
+if(typeof DungeonBuff !== 'undefined'){
+  DungeonBuff.registerIntentApplier('comboRedeem', function(DRef, intent){
+    return dungeonRedeemCombo(intent);
+  });
+  // 额外连击最后加入：只进后续词连击余额，不增加爆发累计
+  DungeonBuff.registerIntentApplier('extraCombo', function(DRef, intent){
+    const n = Math.floor(intent.value || 0);
+    if(n <= 0) return { applied: false };
+    S.combo += n;
+    return { applied: true, actualDelta: n };
+  });
 }
 
 // ===== Boss关 =====
@@ -386,9 +584,9 @@ function dungeonApplyRegret(){
   const scorePenalty = regretLv * 2;
   const timePenalty = Math.max(0, regretLv - 2);
   if(typeof S!=='undefined'){
-    S.totalScore = Math.max(0, S.totalScore - scorePenalty);
-    S.stageScore -= scorePenalty;
-    if(timePenalty > 0) S.timeLeft = Math.max(0, S.timeLeft - timePenalty);
+    dungeonChangeResource('score',-scorePenalty,{sourceCategory:'CURSE',sourceReason:'regret'});
+    dungeonChangeResource('rankScore',-scorePenalty,{sourceCategory:'CURSE',sourceReason:'regret'});
+    if(timePenalty > 0) dungeonChangeResource('time',-timePenalty,{sourceCategory:'CURSE',sourceReason:'regret'});
   }
 }
 
@@ -1096,14 +1294,14 @@ function dungeonCanAfford(price, cur){
 }
 
 function dungeonDeductCost(price, cur){
-  if(cur==='G') D.gold-=price, dungeonRenderGoldUI();
+  if(cur==='G') dungeonChangeResource('gold',-price,{sourceCategory:'PURCHASE',sourceReason:'shop'});
   if(cur==='P'){
-    S.totalScore=Math.max(0,S.totalScore-price);
+    dungeonChangeResource('score',-price,{sourceCategory:'PURCHASE',sourceReason:'shop'});
     const box=document.getElementById('soloScoreBox');
     if(box) box.innerHTML=S.totalScore+' <span style="font-size:0.6em">P</span>';
   }
   if(cur==='T'){
-    S.timeLeft=Math.max(0,S.timeLeft-price);
+    dungeonChangeResource('time',-price,{sourceCategory:'PURCHASE',sourceReason:'shop'});
     if(typeof soloUpdateTimerBar==='function') soloUpdateTimerBar();
   }
 }
@@ -1764,6 +1962,14 @@ function dungeonBuffRemaining(buffId){
   return has ? n : 0;
 }
 
+function dungeonInterruptWord(reason, previousCombo){
+  const payload=Object.assign(DungeonBuff.wordContext(D),{reason:reason,previousCombo:previousCombo});
+  dungeonDispatch('WORD_INTERRUPTED',payload);
+  DungeonBuff.recordWordResult(D,'interruption',payload);
+  dungeonDispatch('COMBO_BREAK',payload);
+  return payload;
+}
+
 // ===== 暴露全局接口供主文件调用 =====
 window.Dungeon = {
   state: D,
@@ -1772,7 +1978,24 @@ window.Dungeon = {
   reset: dungeonReset,
   isActive: isDungeonActive,
   addStress: dungeonAddStress,
+  reduceStress: dungeonReduceStress,
+  getTotalTimeFlowMultiplier: dungeonGetTotalTimeFlowMultiplier,
+  getWordTimeFlowMultiplier: dungeonGetWordTimeFlowMultiplier,
+  consumeCombo: dungeonConsumeCombo,
+  redeemCombo: dungeonRedeemCombo,
+  settleWord: dungeonSettleWord,
+  settleCard: dungeonSettleCard,
+  startWord: function(input){
+    D._suppRankTotal = 0;
+    return DungeonBuff.startWord(D, input);
+  },
+  wordContext: function(){ return DungeonBuff.wordContext(D); },
+  wordResults: function(){ return DungeonBuff.wordResults(D); },
+  recordWordResult: function(type, result){ DungeonBuff.recordWordResult(D, type, result); },
+  interruptWord: dungeonInterruptWord,
+  letterGroup: function(letter){ return DungeonBuff.letterGroup(letter); },
   addGold: dungeonAddGold,
+  changeResource: dungeonChangeResource,
   checkBoss: dungeonCheckBoss,
   enterBoss: dungeonEnterBoss,
   exitBoss: dungeonExitBoss,

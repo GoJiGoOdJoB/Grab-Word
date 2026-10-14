@@ -2915,6 +2915,7 @@ function soloStartTimer(){
     if(window.Dungeon && Dungeon.isActive()){
       gflow *= Dungeon.getFlowRateMultiplier();
       gflow *= (1 + (Dungeon.state._shackleFlowBonus||0));
+      gflow *= Dungeon.getTotalTimeFlowMultiplier();
     }
     S.timeLeft-=0.1*gflow;
     if(S.timeLeft<0)S.timeLeft=0;
@@ -3006,11 +3007,13 @@ function soloApplyWrongPenalty(options){
   options=options||{};
   const p=soloWrongPenalty();
   const dgn=(window.Dungeon && Dungeon.isActive());
+  const result={wordTimePenaltyMs:0,totalTimePenalty:0,flowPenalty:0};
   // flow rate penalty: 4th wrong onwards, +0.2 global flow each (勇气减伤·wrongFlow)
   if(!options.preventExtraPenalty && S.wrongCount>=4){
     const fp=dgn?Dungeon.brvMitigate('wrongFlow',0.2):0.2;
     S.globalFlowRate+=fp;
     S.wrongFlowPenalty+=fp;
+    result.flowPenalty=fp;
     document.getElementById('soloTimerWrap').classList.add('flow-penalty');
   }
   // word time penalty: reduce current layer ms (cascade across layers)
@@ -3021,14 +3024,24 @@ function soloApplyWrongPenalty(options){
     const preLayer=S.wordTimerLayer;
 
     let ms=dgn?Dungeon.brvMitigate('wordTime',p.word*1000):p.word*1000;
+    result.wordTimePenaltyMs=ms;
     S.wordTimerMs-=ms;
     while(S.wordTimerMs<=0){
       S.wordTimerLayer--;
       S.wordTimerMs+=4000;
       if(S.wordTimerLayer<0){
-        S.totalScore=Math.max(0,S.totalScore-1);
-        S.stageScore-=1;
-        if(S.wordTimerLayer===-1){S.combo=0;S.burstCounter=0;S.burstQualities=[];soloUpdateCombo();}
+        if(dgn){
+          Dungeon.changeResource('score',-1,{sourceReason:'wrong_layer'});
+          Dungeon.changeResource('rankScore',-1,{sourceReason:'wrong_layer'});
+        } else {
+          S.totalScore=Math.max(0,S.totalScore-1);
+          S.stageScore-=1;
+        }
+        if(S.wordTimerLayer===-1){
+          const previousCombo=S.combo;
+          S.combo=0;S.burstCounter=0;S.burstQualities=[];soloUpdateCombo();
+          if(dgn) Dungeon.interruptWord('wrong_penalty',previousCombo);
+        }
       }
     }
     const postWidth=Math.max(0,S.wordTimerMs/4000*100);
@@ -3059,10 +3072,13 @@ function soloApplyWrongPenalty(options){
   if(!options.preventTimePenalty && p.total>0){
     if(!S.timeFractional)S.timeFractional=true;
     const totalPen=dgn?Dungeon.brvMitigate('totalTime',p.total):p.total;
-    S.timeLeft=Math.max(0,S.timeLeft-totalPen);
+    result.totalTimePenalty=Math.min(S.timeLeft,totalPen);
+    if(dgn) Dungeon.changeResource('time',-totalPen,{sourceReason:'wrong_penalty'});
+    else S.timeLeft=Math.max(0,S.timeLeft-totalPen);
     soloUpdateTimerBar();
     if(S.timeLeft<=0)soloEndGame();
   }
+  return result;
 }
 
 function soloRollShiny(){
@@ -3125,7 +3141,8 @@ function soloSetupWord(promoOverride){
   soloStartWordTimer();
   soloRenderAll();
   if(window.Dungeon&&Dungeon.isActive()){
-    Dungeon.dispatch('WORD_START',{wordSerial:S.wordSerial,wordId:S.currentWord.en,slots:S.slots,handTiles:Array.from(document.getElementById('soloHand').children)});
+    const context=Dungeon.startWord({wordSerial:S.wordSerial,wordId:S.currentWord.en,spelling:S.currentWord.en,pos:S.currentWord.pos,plannedBlankCount:blankCount,actualBlankPositions:blankPositions,handLetters:S.hand});
+    Dungeon.dispatch('WORD_START',context);
   }
 }
 
@@ -3152,6 +3169,7 @@ function soloStartWordTimer(){
     if(window.Dungeon && Dungeon.isActive()){
       flowMult *= Dungeon.getFlowRateMultiplier();
       flowMult *= (1 + (Dungeon.state._shackleFlowBonus||0));
+      flowMult *= Dungeon.getWordTimeFlowMultiplier();
     }
     S.wordTimerMs-=100*flowMult;
 
@@ -3182,13 +3200,20 @@ function soloStartWordTimer(){
             return;
           }
         }
-        S.totalScore=Math.max(0,S.totalScore-1);
-        S.stageScore-=1;
+        if(window.Dungeon&&Dungeon.isActive()){
+          Dungeon.changeResource('score',-1,{sourceReason:'timeout_layer'});
+          Dungeon.changeResource('rankScore',-1,{sourceReason:'timeout_layer'});
+        } else {
+          S.totalScore=Math.max(0,S.totalScore-1);
+          S.stageScore-=1;
+        }
         soloUpdateStageUI();
         if(S.wordTimerLayer===-1){
+          const previousCombo=S.combo;
           S.combo=0;S.burstCounter=0;S.burstQualities=[];
           soloUpdateCombo();
           if(window.Dungeon&&Dungeon.isActive()){
+            Dungeon.interruptWord('timeout',previousCombo);
             Dungeon.dispatch('AFTER_TIMEOUT',{wordSerial:S.wordSerial,lostLayer:true,lostLife:false,ended:false});
             Dungeon.dispatch('TIMEOUT');
           }
@@ -3282,15 +3307,17 @@ function soloPlayCard(idx){
     let cd=S.wrongCount>=3?1000:500;
     if(window.Dungeon && Dungeon.isActive()) cd=Dungeon.brvMitigate('wrongCooldown', cd);
     setTimeout(()=>{S.cooldown=false;container.classList.remove('penalty');if(cardEl)cardEl.classList.remove('wrong-card');},cd);
-    soloApplyWrongPenalty(beforeWrong||{});
+    const penaltyResult=soloApplyWrongPenalty(beforeWrong||{});
     // 地牢：错牌压力(第3次起累计) — 勇气减伤
     let appliedStress=0;
     if(window.Dungeon && Dungeon.isActive() && !beforeWrong.preventStress && S.wrongCount>=3){
-      appliedStress=Dungeon.brvMitigate('wrongStress', S.wrongCount - 2);
-      Dungeon.addStress(appliedStress);
+      const stressResult=Dungeon.addStress(Dungeon.brvMitigate('wrongStress', S.wrongCount - 2));
+      appliedStress=stressResult.actualAdded;
     }
     if(window.Dungeon&&Dungeon.isActive()){
-      Dungeon.dispatch('AFTER_WRONG',{wordSerial:S.wordSerial,cardSerial:S.cardSerial,appliedTimePenalty:!beforeWrong.preventTimePenalty,appliedStress:appliedStress,cooldown:cd});
+      const wrongResult=Object.assign(Dungeon.wordContext(),penaltyResult,{eventSerial:beforeWrong.eventSerial,wordSerial:S.wordSerial,cardSerial:S.cardSerial,appliedTimePenalty:penaltyResult.wordTimePenaltyMs>0||penaltyResult.totalTimePenalty>0,appliedStress:appliedStress,cooldown:cd});
+      Dungeon.recordWordResult('wrong',wrongResult);
+      Dungeon.dispatch('AFTER_WRONG',wrongResult);
       Dungeon.dispatch('WRONG');
     }
     return;
@@ -3301,7 +3328,8 @@ function soloPlayCard(idx){
   S.slots[nextBlank].filledBy='p1';
   const correctCardSerial=++S.cardSerial;
   if(window.Dungeon&&Dungeon.isActive()){
-    Dungeon.dispatch('CARD_CORRECT',{wordSerial:S.wordSerial,cardSerial:correctCardSerial,cardIndex:idx,letter:letter,isFirstCorrectInWord:S.slots.filter(s=>s.filledBy==='p1').length===1});
+    const cardResult=Dungeon.dispatch('CARD_CORRECT',Object.assign(Dungeon.wordContext(),{wordSerial:S.wordSerial,cardSerial:correctCardSerial,cardIndex:idx,originalIndex:nextBlank,letter:letter,letterGroup:Dungeon.letterGroup(letter),isFirstCorrectInWord:S.slots.filter(s=>s.filledBy==='p1').length===1}));
+    Dungeon.settleCard(cardResult);
   }
 
   // animate fly out + draw
@@ -3382,7 +3410,7 @@ function soloCheckComplete(){
     const previousCombo=S.combo;
     S.combo=0; // combo break
     if(window.Dungeon && Dungeon.isActive()){
-      Dungeon.dispatch('COMBO_BREAK',{wordSerial:S.wordSerial,previousCombo:previousCombo,reason:'word_quality'});
+      Dungeon.interruptWord('word_quality',previousCombo);
       Dungeon.applyRegret();
     }
   } else {
@@ -3401,14 +3429,21 @@ function soloCheckComplete(){
     S.burstQualities=[];
   }
 
-  S.totalScore+=totalPts;
-  S.stageScore+=totalPts;
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.changeResource('score',totalPts,{sourceReason:'word_complete'});
+    Dungeon.changeResource('rankScore',totalPts,{sourceReason:'word_complete'});
+  } else {
+    S.totalScore+=totalPts;
+    S.stageScore+=totalPts;
+  }
   // 地牢：力量额外段位积分 + 乏力减少
+  let attributeRankBonus=0;
   if(window.Dungeon && Dungeon.isActive() && totalPts>0){
     let bonus = Dungeon.getPromoScoreBonus(totalPts);
     const fatigueRed = Dungeon.getFatigueReduction();
     if(fatigueRed>0) bonus = Math.round(bonus * (1-fatigueRed));
-    S.stageScore += bonus;
+    attributeRankBonus=bonus;
+    Dungeon.changeResource('rankScore',bonus,{sourceCategory:'ATTR',sourceReason:'promo_bonus'});
   }
   S.correctCount++;
   S.streakCount++;
@@ -3425,8 +3460,15 @@ function soloCheckComplete(){
   if(S.burstCounter>=10){
     burstPerfect=S.burstQualities.every(q=>q==='S');
     burstBonus=burstPerfect?30:20;
-    S.totalScore+=burstBonus;S.stageScore+=burstBonus;
-    if(burstPerfect){S.timeLeft=Math.min(999,S.timeLeft+5);soloShowTimeBonus('+5 (完美爆发)');}
+    if(window.Dungeon&&Dungeon.isActive()){
+      Dungeon.changeResource('score',burstBonus,{sourceReason:'burst'});
+      Dungeon.changeResource('rankScore',burstBonus,{sourceReason:'burst'});
+    } else { S.totalScore+=burstBonus;S.stageScore+=burstBonus; }
+    if(burstPerfect){
+      if(window.Dungeon&&Dungeon.isActive()) Dungeon.changeResource('time',5,{sourceReason:'perfect_burst',maxValue:999});
+      else S.timeLeft=Math.min(999,S.timeLeft+5);
+      soloShowTimeBonus('+5 (完美爆发)');
+    }
     soloShowBurst(burstPerfect);
     // 地牢：连击爆发金币
     if(window.Dungeon && Dungeon.isActive()){
@@ -3442,7 +3484,10 @@ function soloCheckComplete(){
   soloAddWordBook(quality);
   soloFlyStars(rawEarned, S.isShiny, comboBonus+burstBonus);
   if(window.Dungeon&&Dungeon.isActive()){
-    Dungeon.dispatch('WORD_COMPLETE',{wordSerial:S.wordSerial,isShiny:S.isShiny,rawScore:rawEarned,finalScore:totalPts+burstBonus});
+    const completion=Object.assign(Dungeon.wordContext(),Dungeon.wordResults(),{wordSerial:S.wordSerial,quality:quality,isShiny:S.isShiny,wrongCount:S.wrongCount,rawScore:rawEarned,finalScore:totalPts+burstBonus,comboBeforeItemSettlement:S.combo,baseResources:{score:totalPts+burstBonus,rankScore:totalPts+burstBonus,gold:burstBonus>0?(burstPerfect?Dungeon.cfg.goldPerPerfectBurst:Dungeon.cfg.goldPerBurst):0},attributeRankBonus:attributeRankBonus,comboBonus:comboBonus,burstBonus:burstBonus});
+    Dungeon.settleWord(completion);
+    soloUpdateCombo();
+    soloUpdateStageUI();
   }
 
   // check promotion conditions (not during promo question)
@@ -3505,8 +3550,10 @@ function soloHandleIncomplete(earnedPts){
 function soloPassAction(){
   if(!S.running||S.transitioning||S.passed)return;
   S.passed=true;
+  const previousCombo=S.combo;
   S.combo=0;
   S.burstCounter=0;S.burstQualities=[];
+  if(window.Dungeon&&Dungeon.isActive()) Dungeon.interruptWord('pass',previousCombo);
   soloUpdateCombo();
   clearInterval(S.wordTimer);
   document.getElementById('soloHand').classList.add('passed');
@@ -3514,8 +3561,13 @@ function soloPassAction(){
 
   // pass penalty: deduct base score
   const penalty=S.blankCount;
-  S.totalScore=Math.max(0,S.totalScore-penalty);
-  S.stageScore-=penalty;
+  if(window.Dungeon&&Dungeon.isActive()){
+    Dungeon.changeResource('score',-penalty,{sourceReason:'pass'});
+    Dungeon.changeResource('rankScore',-penalty,{sourceReason:'pass'});
+  } else {
+    S.totalScore=Math.max(0,S.totalScore-penalty);
+    S.stageScore-=penalty;
+  }
   document.getElementById('soloStatus').textContent=`-${penalty} (PASS)`;
   soloAddWordBook('C');
   soloUpdateStageUI();
@@ -3573,7 +3625,11 @@ function soloPromote(){
   } else {
     timeBonus=[20,30,40][tier];
   }
-  if(timeBonus>0){S.timeLeft=Math.min(999,S.timeLeft+timeBonus);soloShowTimeBonus(`+${timeBonus} (升段)`);}
+  if(timeBonus>0){
+    if(window.Dungeon&&Dungeon.isActive()) Dungeon.changeResource('time',timeBonus,{sourceReason:'promotion',maxValue:999});
+    else S.timeLeft=Math.min(999,S.timeLeft+timeBonus);
+    soloShowTimeBonus(`+${timeBonus} (升段)`);
+  }
 
   S.wordQueue=shuffle(getEffectiveWords()[soloStage().bank]);
 
@@ -3635,7 +3691,8 @@ function soloPromoFail(){
   // penalties: hidden counter -5, stage score -N (tier based), no total score change
   S.correctCount=Math.max(0,S.correctCount-5);
   const penalty=soloPromoFailPenalty(S.stageIdx);
-  S.stageScore-=penalty;
+  if(window.Dungeon&&Dungeon.isActive()) Dungeon.changeResource('rankScore',-penalty,{sourceReason:'promotion_failure'});
+  else S.stageScore-=penalty;
   S.streakCount=0;
 
   const flash=document.createElement('div');
